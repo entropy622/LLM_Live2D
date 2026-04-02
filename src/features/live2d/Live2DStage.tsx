@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { AvatarManifest, ExpressionKey } from './avatarManifest.ts';
 import {
   applyExpression,
@@ -13,12 +13,31 @@ type Live2DStageProps = {
   avatar: AvatarManifest;
   expression: ExpressionKey;
   transform: StageTransform;
+  onTransformChange: (transform: StageTransform) => void;
 };
 
-export function Live2DStage({ avatar, expression, transform }: Live2DStageProps) {
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  origin: StageTransform;
+  mode: 'move' | 'scale';
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function Live2DStage({
+  avatar,
+  expression,
+  transform,
+  onTransformChange,
+}: Live2DStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<Awaited<ReturnType<typeof createLive2DRuntime>> | null>(null);
   const transformRef = useRef(transform);
+  const dragStateRef = useRef<DragState | null>(null);
   const [status, setStatus] = useState('Loading');
 
   useEffect(() => {
@@ -92,9 +111,74 @@ export function Live2DStage({ avatar, expression, transform }: Live2DStageProps)
     updateStageTransform(runtimeRef.current, containerRef.current, transform);
   }, [transform]);
 
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: transformRef.current,
+      mode: event.shiftKey ? 'scale' : 'move',
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setStatus(event.shiftKey ? 'Scaling' : 'Dragging');
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const container = containerRef.current;
+    const dragState = dragStateRef.current;
+    if (!container || !dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+
+    if (dragState.mode === 'scale') {
+      const nextScale = clamp(dragState.origin.scale - deltaY / 90, 0.05, 8);
+      onTransformChange({
+        ...dragState.origin,
+        scale: nextScale,
+      });
+      return;
+    }
+
+    onTransformChange({
+      ...dragState.origin,
+      offsetX: clamp(dragState.origin.offsetX + (deltaX / container.clientWidth) * 4.2, -2.4, 2.4),
+      offsetY: clamp(
+        dragState.origin.offsetY + (deltaY / container.clientHeight) * 4.2,
+        -1.8,
+        1.8,
+      ),
+    });
+  }
+
+  function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragStateRef.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    dragStateRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setStatus('Ready');
+  }
+
   return (
-    <div className="stage-shell">
+    <div
+      className="stage-shell"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       <div ref={containerRef} className="stage-canvas" />
+      <div className="stage-hint">Drag to move. Hold Shift and drag to scale.</div>
       <div className="stage-status">{status}</div>
     </div>
   );

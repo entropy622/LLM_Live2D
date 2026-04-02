@@ -114,7 +114,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <section className="viewer-panel">
-        <div className="panel-header">
+        <div className="panel-header chat-header">
           <div>
             <p className="eyebrow">Live2D Lab</p>
             <h1>LLM x Expression Control</h1>
@@ -138,6 +138,7 @@ export default function App() {
           avatar={selectedAvatar}
           expression={activeExpression}
           transform={stageTransform}
+          onTransformChange={setStageTransform}
         />
 
         <div className="panel-footer">
@@ -150,8 +151,8 @@ export default function App() {
               <span>Scale {stageTransform.scale.toFixed(2)}</span>
               <input
                 type="range"
-                min="0.5"
-                max="1.8"
+                min="0.05"
+                max="8"
                 step="0.01"
                 value={stageTransform.scale}
                 onChange={(event) => updateTransform({ scale: Number(event.target.value) })}
@@ -161,8 +162,8 @@ export default function App() {
               <span>X {stageTransform.offsetX.toFixed(2)}</span>
               <input
                 type="range"
-                min="-0.35"
-                max="0.35"
+                min="-2.4"
+                max="2.4"
                 step="0.01"
                 value={stageTransform.offsetX}
                 onChange={(event) => updateTransform({ offsetX: Number(event.target.value) })}
@@ -172,8 +173,8 @@ export default function App() {
               <span>Y {stageTransform.offsetY.toFixed(2)}</span>
               <input
                 type="range"
-                min="-0.25"
-                max="0.25"
+                min="-1.8"
+                max="1.8"
                 step="0.01"
                 value={stageTransform.offsetY}
                 onChange={(event) => updateTransform({ offsetY: Number(event.target.value) })}

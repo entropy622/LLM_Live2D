@@ -38,15 +38,19 @@ button {
 
 .app-shell {
   min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: minmax(320px, 1.2fr) minmax(320px, 0.9fr);
   gap: 20px;
   padding: 20px;
+  min-width: 0;
 }
 
 .viewer-panel,
 .chat-panel {
-  min-height: calc(100vh - 40px);
+  min-height: 0;
+  height: calc(100vh - 40px);
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 28px;
   background: rgba(14, 17, 23, 0.72);
@@ -55,6 +59,11 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.chat-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .panel-header {
@@ -127,6 +136,18 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #d7cabb;
   font-size: 0.85rem;
+}
+
+.stage-hint {
+  position: absolute;
+  inset: 18px auto auto 18px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #d7cabb;
+  font-size: 0.78rem;
+  pointer-events: none;
 }
 
 .panel-footer {
@@ -236,7 +257,8 @@ button {
 }
 
 .messages {
-  flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: auto;
   display: grid;
   gap: 12px;
@@ -248,6 +270,7 @@ button {
   border-radius: 18px;
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .message header {
@@ -255,11 +278,15 @@ button {
   justify-content: space-between;
   gap: 12px;
   color: #f5ebdd;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .message p {
   line-height: 1.6;
   color: #f3f0ea;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .message.user {
@@ -274,11 +301,13 @@ button {
   padding: 0 24px 24px;
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .composer textarea {
   resize: vertical;
   min-height: 112px;
+  max-width: 100%;
 }
 
 .composer button {
@@ -298,12 +327,13 @@ button {
 
 @media (max-width: 1080px) {
   .app-shell {
+    height: auto;
     grid-template-columns: 1fr;
   }
 
   .viewer-panel,
   .chat-panel {
-    min-height: auto;
+    height: auto;
   }
 
   .stage-shell {
