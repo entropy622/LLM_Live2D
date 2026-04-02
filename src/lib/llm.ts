@@ -23,6 +23,14 @@ type CreateAssistantResponseArgs = {
   systemPrompt: string;
 };
 
+export type LlmSettings = {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+};
+
+const llmSettingsStorageKey = 'llm-live2d:llm-settings';
+
 const allowedExpressions: ExpressionKey[] = [
   'neutral',
   'happy',
@@ -61,15 +69,71 @@ function stripMarkdownFence(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 }
 
+export function getDefaultLlmSettings(): LlmSettings {
+  return {
+    apiUrl: import.meta.env.VITE_LLM_API_URL ?? '',
+    apiKey: import.meta.env.VITE_LLM_API_KEY ?? '',
+    model: import.meta.env.VITE_LLM_MODEL ?? '',
+  };
+}
+
+export function loadStoredLlmSettings(): LlmSettings {
+  const fallback = getDefaultLlmSettings();
+
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(llmSettingsStorageKey);
+    if (!raw) {
+      return fallback;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<LlmSettings>;
+    return {
+      apiUrl: parsed.apiUrl?.trim() || fallback.apiUrl,
+      apiKey: parsed.apiKey?.trim() || fallback.apiKey,
+      model: parsed.model?.trim() || fallback.model,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveStoredLlmSettings(settings: LlmSettings) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(
+    llmSettingsStorageKey,
+    JSON.stringify({
+      apiUrl: settings.apiUrl.trim(),
+      apiKey: settings.apiKey.trim(),
+      model: settings.model.trim(),
+    }),
+  );
+}
+
+export function clearStoredLlmSettings() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(llmSettingsStorageKey);
+}
+
 async function requestRemoteAssistant({
   avatar,
   userInput,
   history,
   systemPrompt,
 }: CreateAssistantResponseArgs): Promise<AssistantResponse | null> {
-  const apiUrl = import.meta.env.VITE_LLM_API_URL;
-  const apiKey = import.meta.env.VITE_LLM_API_KEY;
-  const model = import.meta.env.VITE_LLM_MODEL;
+  const settings = loadStoredLlmSettings();
+  const apiUrl = settings.apiUrl;
+  const apiKey = settings.apiKey;
+  const model = settings.model;
 
   if (!apiUrl || !apiKey || !model) {
     return null;

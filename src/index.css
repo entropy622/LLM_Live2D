@@ -5,11 +5,12 @@
   background:
     radial-gradient(circle at top, rgba(212, 168, 92, 0.16), transparent 32%),
     linear-gradient(135deg, #241b20 0%, #15161a 52%, #0f1418 100%);
-  font-family:
+  --ui-font:
     "Segoe UI",
     "PingFang SC",
     "Microsoft YaHei",
     sans-serif;
+  font-family: var(--ui-font);
 }
 
 * {
@@ -28,8 +29,19 @@ body {
 
 button,
 textarea,
-select {
+select,
+input {
   font: inherit;
+}
+
+select,
+option {
+  font-family: var(--ui-font);
+}
+
+option {
+  color: #16181d;
+  background: #f4efe7;
 }
 
 button {
@@ -66,6 +78,12 @@ button {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
+.chat-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -100,13 +118,22 @@ button {
 }
 
 .field select,
-.composer textarea {
+.composer textarea,
+.field input {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   color: #f8f3eb;
   padding: 12px 14px;
   outline: none;
+}
+
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  line-height: 1.2;
+  font-weight: 500;
 }
 
 .stage-shell {
@@ -197,22 +224,33 @@ button {
 }
 
 .chip {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #ece5d8;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #b9b1a4;
+  font-size: 0.82rem;
+  line-height: 1;
   transition:
-    transform 140ms ease,
     background 140ms ease,
-    border-color 140ms ease;
+    border-color 140ms ease,
+    color 140ms ease;
 }
 
-.chip:hover,
+.chip.readonly {
+  cursor: default;
+}
+
 .chip.active {
-  transform: translateY(-1px);
-  background: rgba(214, 167, 97, 0.14);
-  border-color: rgba(214, 167, 97, 0.5);
+  background: rgba(214, 167, 97, 0.12);
+  border-color: rgba(214, 167, 97, 0.38);
+  color: #f2e7d7;
+}
+
+.chip.readonly:hover {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #b9b1a4;
 }
 
 .directive-card {
@@ -245,6 +283,76 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.settings-entry,
+.settings-close,
+.settings-save {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.settings-entry,
+.settings-close {
+  background: rgba(255, 255, 255, 0.04);
+  color: #ece5d8;
+}
+
+.settings-save {
+  border: 0;
+  color: #231910;
+  background: linear-gradient(135deg, #e1b25f, #ffd394);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-key-field {
+  grid-column: 1 / -1;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.6);
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.settings-modal {
+  width: min(680px, 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(17, 19, 25, 0.98));
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.4);
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.settings-modal-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
 }
 
 .directive-box {
@@ -369,12 +477,34 @@ button {
     width: 100%;
   }
 
+  .chat-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .directive-grid {
     grid-template-columns: 1fr;
   }
 
   .transform-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .settings-modal {
+    padding: 18px;
+  }
+
+  .settings-modal-header {
+    flex-direction: column;
   }
 
   .composer button {

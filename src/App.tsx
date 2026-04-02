@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
   EXPRESSION_LABELS,
@@ -9,8 +9,12 @@ import {
 import {
   createAssistantResponse,
   createSystemPrompt,
+  getDefaultLlmSettings,
+  loadStoredLlmSettings,
+  saveStoredLlmSettings,
   type AssistantResponse,
   type ChatMessage,
+  type LlmSettings
 } from './lib/llm.ts';
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
@@ -31,6 +35,8 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [activeExpression, setActiveExpression] = useState<ExpressionKey>('neutral');
   const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
+  const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedAvatar = avatars[selectedAvatarId];
   const [stageTransform, setStageTransform] = useState<StageTransform>(
@@ -43,6 +49,10 @@ export default function App() {
       ) as ExpressionKey[],
     [selectedAvatar],
   );
+
+  useEffect(() => {
+    setLlmSettings(loadStoredLlmSettings());
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,7 +107,7 @@ export default function App() {
       {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `Switched to ${avatars[avatarId].name}. Use the chips below to test manual expressions or chat on the right.`,
+        content: `Switched to ${avatars[avatarId].name}.`,
         expression: 'neutral',
         meta: 'system',
       },
@@ -109,6 +119,21 @@ export default function App() {
       ...current,
       ...patch,
     }));
+  }
+
+  function updateLlmSettings(patch: Partial<LlmSettings>) {
+    setLlmSettings((current) => ({
+      ...current,
+      ...patch,
+    }));
+  }
+
+  function handleSaveLlmSettings() {
+    saveStoredLlmSettings(llmSettings);
+  }
+
+  function handleCloseSettings() {
+    setSettingsOpen(false);
   }
 
   return (
@@ -190,14 +215,12 @@ export default function App() {
           </div>
           <div className="chip-row">
             {sortedExpressions.map((expression) => (
-              <button
+              <span
                 key={expression}
-                type="button"
-                className={expression === activeExpression ? 'chip active' : 'chip'}
-                onClick={() => setActiveExpression(expression)}
+                className={expression === activeExpression ? 'chip active readonly' : 'chip readonly'}
               >
                 {EXPRESSION_LABELS[expression]}
-              </button>
+              </span>
             ))}
           </div>
         </div>
@@ -209,9 +232,18 @@ export default function App() {
             <p className="eyebrow">Dialogue</p>
             <h2>Structured Control Loop</h2>
           </div>
-          <div className="directive-card">
-            <p>{lastDirective?.source === 'remote' ? 'Remote LLM' : 'Local Mock'}</p>
-            <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? 'neutral']}</strong>
+          <div className="chat-header-actions">
+            <button
+              type="button"
+              className="settings-entry"
+              onClick={() => setSettingsOpen(true)}
+            >
+              LLM Settings
+            </button>
+            <div className="directive-card">
+              <p>{lastDirective?.source === 'remote' ? 'Remote LLM' : 'Local Mock'}</p>
+              <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? 'neutral']}</strong>
+            </div>
           </div>
         </div>
 
@@ -258,6 +290,62 @@ export default function App() {
           </button>
         </form>
       </section>
+
+      {settingsOpen ? (
+        <div className="settings-modal-backdrop" onClick={handleCloseSettings}>
+          <section
+            className="settings-modal"
+            onClick={(event) => event.stopPropagation()}
+            aria-label="LLM Settings"
+          >
+            <div className="settings-modal-header">
+              <div>
+                <p className="eyebrow">Settings</p>
+                <h2>LLM Settings</h2>
+              </div>
+              <button type="button" className="settings-close" onClick={handleCloseSettings}>
+                Close
+              </button>
+            </div>
+
+            <div className="settings-grid">
+              <label className="field">
+                <span>API URL</span>
+                <input
+                  type="text"
+                  value={llmSettings.apiUrl}
+                  onChange={(event) => updateLlmSettings({ apiUrl: event.target.value })}
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="field">
+                <span>Model</span>
+                <input
+                  type="text"
+                  value={llmSettings.model}
+                  onChange={(event) => updateLlmSettings({ model: event.target.value })}
+                  placeholder="gpt-4.1-mini"
+                />
+              </label>
+              <label className="field settings-key-field">
+                <span>API Key</span>
+                <input
+                  type="password"
+                  value={llmSettings.apiKey}
+                  onChange={(event) => updateLlmSettings({ apiKey: event.target.value })}
+                  placeholder="sk-..."
+                />
+              </label>
+            </div>
+
+            <div className="settings-actions">
+              <button type="button" className="settings-save" onClick={handleSaveLlmSettings}>
+                Save
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
