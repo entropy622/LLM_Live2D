@@ -1,0 +1,30 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "兔子洞ldd.moc3",
+		"Textures": [
+			"兔子洞ldd.2048/texture_00.png",
+			"兔子洞ldd.2048/texture_01.png"
+		],
+		"Physics": "兔子洞ldd.physics3.json",
+		"DisplayInfo": "兔子洞ldd.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthForm",
+				"ParamMouthOpenY"
+			]
+		}
+	]
+}

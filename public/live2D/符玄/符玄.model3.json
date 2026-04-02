@@ -1,0 +1,33 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "符玄.moc3",
+		"Textures": [
+			"符玄.4096/texture_00.png",
+			"符玄.4096/texture_01.png",
+			"符玄.4096/texture_02.png",
+			"符玄.4096/texture_03.png",
+			"符玄.4096/texture_04.png",
+			"符玄.4096/texture_05.png",
+			"符玄.4096/texture_06.png",
+			"符玄.4096/texture_07.png"
+		],
+		"Physics": "符玄.physics3.json",
+		"DisplayInfo": "符玄.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	]
+}

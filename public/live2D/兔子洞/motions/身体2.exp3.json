@@ -1,0 +1,15 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "tqh3",
+            "Value": -1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamAngleX",
+            "Value": -22.81110191345215,
+            "Blend": "Add"
+        }
+    ]
+}
