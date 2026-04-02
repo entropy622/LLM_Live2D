@@ -95,19 +95,23 @@ const fuxuanNeutral = {
   ParamBrowRForm: 0,
 };
 
-const rabbitFolder = '/live2D/\u5154\u5b50\u6d1e';
+function publicAsset(assetPath: string) {
+  return `${import.meta.env.BASE_URL}${assetPath.replace(/^\/+/, '')}`;
+}
+
+const rabbitFolder = publicAsset('live2D/\u5154\u5b50\u6d1e');
 const rabbitModel = `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`;
 const rabbitMotion = `${rabbitFolder}/motions`;
 
-const fuxuanFolder = '/live2D/\u7b26\u7384';
-const huohuoFolder = '/live2D/\u85ff\u85ff';
+const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
+const huohuoFolder = publicAsset('live2D/\u85ff\u85ff');
 
 export const avatars: Record<string, AvatarManifest> = {
   yumi: {
     id: 'yumi',
     name: 'Yumi',
     summary: 'Best expression coverage. Use it as the main semantic-to-expression reference model.',
-    modelJson: '/live2D/yumi/yumi.model3.json',
+    modelJson: publicAsset('live2D/yumi/yumi.model3.json'),
     scaleMultiplier: 0.27,
     verticalOffset: 0.08,
     transformDefaults: {
@@ -120,18 +124,18 @@ export const avatars: Record<string, AvatarManifest> = {
         mode: 'preset',
         params: { Paramheilian: 0, Paramheart: 0, Paramleiwangwang: 0, Paramxingxing: 0 },
       },
-      happy: { mode: 'file', file: '/live2D/yumi/\u661f\u661f\u773c.exp3.json' },
-      sad: { mode: 'file', file: '/live2D/yumi/\u6cea\u6c6a\u6c6a.exp3.json' },
-      angry: { mode: 'file', file: '/live2D/yumi/\u9ed1\u8138.exp3.json' },
-      shy: { mode: 'file', file: '/live2D/yumi/\u7231\u5fc3\u773c.exp3.json' },
-      suspicious: { mode: 'file', file: '/live2D/yumi/\u6b6a\u5634.exp3.json' },
-      surprised: { mode: 'file', file: '/live2D/yumi/\u868a\u9999\u773c.exp3.json' },
-      embarrassed: { mode: 'file', file: '/live2D/yumi/\u9ed1\u8138.exp3.json' },
-      playful: { mode: 'file', file: '/live2D/yumi/\u732b\u732b\u5634.exp3.json' },
+      happy: { mode: 'file', file: publicAsset('live2D/yumi/\u661f\u661f\u773c.exp3.json') },
+      sad: { mode: 'file', file: publicAsset('live2D/yumi/\u6cea\u6c6a\u6c6a.exp3.json') },
+      angry: { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
+      shy: { mode: 'file', file: publicAsset('live2D/yumi/\u7231\u5fc3\u773c.exp3.json') },
+      suspicious: { mode: 'file', file: publicAsset('live2D/yumi/\u6b6a\u5634.exp3.json') },
+      surprised: { mode: 'file', file: publicAsset('live2D/yumi/\u868a\u9999\u773c.exp3.json') },
+      embarrassed: { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
+      playful: { mode: 'file', file: publicAsset('live2D/yumi/\u732b\u732b\u5634.exp3.json') },
     },
     motions: {
-      wave: { file: '/live2D/yumi/wave.motion3.json' },
-      tear: { file: '/live2D/yumi/tear.motion3.json' },
+      wave: { file: publicAsset('live2D/yumi/wave.motion3.json') },
+      tear: { file: publicAsset('live2D/yumi/tear.motion3.json') },
     },
   },
   rabbitHole: {

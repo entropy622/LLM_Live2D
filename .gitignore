@@ -24,3 +24,5 @@ dist
 *.sw?
 
 live2D/*
+
+.env.local
