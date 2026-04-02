@@ -5,17 +5,25 @@ import {
   createLive2DRuntime,
   destroyRuntime,
   resizeRuntime,
+  updateStageTransform,
+  type StageTransform,
 } from './live2dEngine.ts';
 
 type Live2DStageProps = {
   avatar: AvatarManifest;
   expression: ExpressionKey;
+  transform: StageTransform;
 };
 
-export function Live2DStage({ avatar, expression }: Live2DStageProps) {
+export function Live2DStage({ avatar, expression, transform }: Live2DStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<Awaited<ReturnType<typeof createLive2DRuntime>> | null>(null);
+  const transformRef = useRef(transform);
   const [status, setStatus] = useState('Loading');
+
+  useEffect(() => {
+    transformRef.current = transform;
+  }, [transform]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -35,6 +43,7 @@ export function Live2DStage({ avatar, expression }: Live2DStageProps) {
 
         runtimeRef.current = runtime;
         await applyExpression(runtime, avatar, 'neutral');
+        updateStageTransform(runtime, container, transformRef.current);
         setStatus('Ready');
       })
       .catch((error) => {
@@ -74,6 +83,14 @@ export function Live2DStage({ avatar, expression }: Live2DStageProps) {
         setStatus('Expression failed');
       });
   }, [avatar, expression]);
+
+  useEffect(() => {
+    if (!runtimeRef.current || !containerRef.current) {
+      return;
+    }
+
+    updateStageTransform(runtimeRef.current, containerRef.current, transform);
+  }, [transform]);
 
   return (
     <div className="stage-shell">

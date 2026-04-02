@@ -135,6 +135,34 @@ button {
   gap: 16px;
 }
 
+.transform-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.slider-field {
+  display: grid;
+  gap: 8px;
+  color: #cabfae;
+  font-size: 0.85rem;
+}
+
+.slider-field input[type='range'] {
+  width: 100%;
+  accent-color: #d6a761;
+}
+
+.reset-button {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #ece5d8;
+  padding: 10px 14px;
+}
+
 .muted {
   margin: 6px 0 0;
   color: #a8abaf;
@@ -281,6 +309,10 @@ button {
   .stage-shell {
     min-height: 360px;
   }
+
+  .transform-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -308,6 +340,10 @@ button {
   }
 
   .directive-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transform-grid {
     grid-template-columns: 1fr;
   }
 

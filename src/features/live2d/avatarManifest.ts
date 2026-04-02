@@ -33,6 +33,11 @@ export type AvatarManifest = {
   modelJson: string;
   scaleMultiplier: number;
   verticalOffset: number;
+  transformDefaults: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  };
   expressions: Partial<Record<ExpressionKey, ExpressionBinding>>;
   motions?: Record<string, MotionBinding>;
 };
@@ -105,6 +110,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: '/live2D/yumi/yumi.model3.json',
     scaleMultiplier: 0.27,
     verticalOffset: 0.08,
+    transformDefaults: {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    },
     expressions: {
       neutral: {
         mode: 'preset',
@@ -131,6 +141,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: rabbitModel,
     scaleMultiplier: 0.54,
     verticalOffset: 0.12,
+    transformDefaults: {
+      scale: 0.9,
+      offsetX: 0,
+      offsetY: 0.02,
+    },
     expressions: {
       neutral: { mode: 'preset', params: { ParamCheek: 0, ParamMouthForm: 0, ParamMouthX: 0 } },
       happy: { mode: 'file', file: `${rabbitMotion}/\u7b11.exp3.json` },
@@ -150,6 +165,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${fuxuanFolder}/\u7b26\u7384.model3.json`,
     scaleMultiplier: 0.28,
     verticalOffset: 0.07,
+    transformDefaults: {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    },
     expressions: {
       neutral: { mode: 'preset', params: fuxuanNeutral },
       happy: {
@@ -240,6 +260,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${huohuoFolder}/\u85ff\u85ff.model3.json`,
     scaleMultiplier: 0.22,
     verticalOffset: 0.06,
+    transformDefaults: {
+      scale: 1.05,
+      offsetX: 0,
+      offsetY: 0,
+    },
     expressions: {
       neutral: { mode: 'preset', params: { Param107: 0, Param108: 0, ParamCheek: 0 } },
       happy: { mode: 'preset', params: genericCutePreset },

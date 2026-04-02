@@ -12,6 +12,7 @@ import {
   type AssistantResponse,
   type ChatMessage,
 } from './lib/llm.ts';
+import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
 const starterMessages: ChatMessage[] = [
   {
@@ -32,6 +33,9 @@ export default function App() {
   const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
 
   const selectedAvatar = avatars[selectedAvatarId];
+  const [stageTransform, setStageTransform] = useState<StageTransform>(
+    selectedAvatar.transformDefaults,
+  );
   const sortedExpressions = useMemo(
     () =>
       Object.keys(selectedAvatar.expressions).sort((left, right) =>
@@ -86,6 +90,7 @@ export default function App() {
 
   function handleAvatarChange(avatarId: string) {
     setSelectedAvatarId(avatarId);
+    setStageTransform(avatars[avatarId].transformDefaults);
     setActiveExpression('neutral');
     setLastDirective(null);
     setMessages([
@@ -97,6 +102,13 @@ export default function App() {
         meta: 'system',
       },
     ]);
+  }
+
+  function updateTransform(patch: Partial<StageTransform>) {
+    setStageTransform((current) => ({
+      ...current,
+      ...patch,
+    }));
   }
 
   return (
@@ -122,12 +134,58 @@ export default function App() {
           </label>
         </div>
 
-        <Live2DStage avatar={selectedAvatar} expression={activeExpression} />
+        <Live2DStage
+          avatar={selectedAvatar}
+          expression={activeExpression}
+          transform={stageTransform}
+        />
 
         <div className="panel-footer">
           <div>
             <p className="section-label">Manifest</p>
             <p className="muted">{selectedAvatar.summary}</p>
+          </div>
+          <div className="transform-grid">
+            <label className="slider-field">
+              <span>Scale {stageTransform.scale.toFixed(2)}</span>
+              <input
+                type="range"
+                min="0.5"
+                max="1.8"
+                step="0.01"
+                value={stageTransform.scale}
+                onChange={(event) => updateTransform({ scale: Number(event.target.value) })}
+              />
+            </label>
+            <label className="slider-field">
+              <span>X {stageTransform.offsetX.toFixed(2)}</span>
+              <input
+                type="range"
+                min="-0.35"
+                max="0.35"
+                step="0.01"
+                value={stageTransform.offsetX}
+                onChange={(event) => updateTransform({ offsetX: Number(event.target.value) })}
+              />
+            </label>
+            <label className="slider-field">
+              <span>Y {stageTransform.offsetY.toFixed(2)}</span>
+              <input
+                type="range"
+                min="-0.25"
+                max="0.25"
+                step="0.01"
+                value={stageTransform.offsetY}
+                onChange={(event) => updateTransform({ offsetY: Number(event.target.value) })}
+              />
+            </label>
+            <button
+              type="button"
+              className="reset-button"
+              onClick={() => setStageTransform(selectedAvatar.transformDefaults)}
+            >
+              Reset Transform
+            </button>
           </div>
           <div className="chip-row">
             {sortedExpressions.map((expression) => (

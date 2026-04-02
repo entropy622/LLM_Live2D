@@ -20,6 +20,15 @@ type RuntimeState = {
   trackedParamIds: Set<string>;
   app: PIXI.Application;
   avatar: AvatarManifest;
+  modelBaseWidth: number;
+  modelBaseHeight: number;
+  currentTransform: StageTransform;
+};
+
+export type StageTransform = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 type CubismCoreModel = {
@@ -69,6 +78,7 @@ function createAugmentedSettings(
   }
 
   return {
+    url: avatar.modelJson,
     ...settings,
     FileReferences: fileReferences,
   };
@@ -112,20 +122,22 @@ function applyPreset(runtime: RuntimeState, binding: ExpressionBinding | undefin
   runtime.activePreset = binding.params;
 }
 
-function fitModel(runtime: RuntimeState, container: HTMLElement) {
+function fitModel(runtime: RuntimeState, container: HTMLElement, transform?: StageTransform) {
   const { model, avatar, app } = runtime;
   const width = container.clientWidth || 800;
   const height = container.clientHeight || 800;
+  const nextTransform = transform ?? runtime.currentTransform;
 
   app.renderer.resize(width, height);
 
-  const baseScale = Math.min(width / model.width, height / model.height);
-  const scale = baseScale * avatar.scaleMultiplier;
+  const baseScale = Math.min(width / runtime.modelBaseWidth, height / runtime.modelBaseHeight);
+  const scale = baseScale * avatar.scaleMultiplier * nextTransform.scale;
 
   model.scale.set(scale);
   model.anchor.set(0.5, 1);
-  model.x = width / 2;
-  model.y = height * (1 - avatar.verticalOffset);
+  model.x = width * (0.5 + nextTransform.offsetX);
+  model.y = height * (1 - avatar.verticalOffset + nextTransform.offsetY);
+  runtime.currentTransform = nextTransform;
 }
 
 export async function createLive2DRuntime(
@@ -154,6 +166,11 @@ export async function createLive2DRuntime(
   });
 
   app.stage.addChild(model);
+  model.scale.set(1);
+
+  const localBounds = model.getLocalBounds();
+  const modelBaseWidth = Math.max(localBounds.width, 1);
+  const modelBaseHeight = Math.max(localBounds.height, 1);
 
   const runtime: RuntimeState = {
     model,
@@ -162,6 +179,9 @@ export async function createLive2DRuntime(
     trackedParamIds: new Set(),
     app,
     avatar,
+    modelBaseWidth,
+    modelBaseHeight,
+    currentTransform: avatar.transformDefaults,
   };
 
   app.ticker.add(() => {
@@ -198,6 +218,14 @@ export async function applyExpression(
 
 export function resizeRuntime(runtime: RuntimeState, container: HTMLElement) {
   fitModel(runtime, container);
+}
+
+export function updateStageTransform(
+  runtime: RuntimeState,
+  container: HTMLElement,
+  transform: StageTransform,
+) {
+  fitModel(runtime, container, transform);
 }
 
 export function destroyRuntime(runtime: RuntimeState) {

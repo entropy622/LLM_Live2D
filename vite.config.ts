@@ -76,7 +76,7 @@ export default defineConfig({
   base: './',
   server: {
     fs: {
-      allow: [live2dRoot],
+      allow: [currentDirectory, live2dRoot],
     },
   },
 });
