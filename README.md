@@ -1,6 +1,10 @@
 # LLM Live2D
 
 一个面向实验的前端项目：把 Live2D 接进 LLM 对话流程，让 LLM 在回复文本的同时控制角色表情。
+体验地址：https://entropy622.github.io/LLM_Live2D/
+
+<img width="2559" height="1348" alt="image" src="https://github.com/user-attachments/assets/ab8ca8ae-3540-4af9-b2ea-508f0d5df10a" />
+
 
 当前重点不是部署架构，而是验证这条链路是否稳定：
 
