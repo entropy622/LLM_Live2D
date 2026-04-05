@@ -9,6 +9,11 @@ export type ExpressionKey =
   | 'embarrassed'
   | 'playful';
 
+export type ExpressionLayer = {
+  key: ExpressionKey;
+  weight: number;
+};
+
 type ExpressionFileBinding = {
   mode: 'file';
   file: string;

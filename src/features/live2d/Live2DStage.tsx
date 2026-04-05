@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { AvatarManifest, ExpressionKey } from './avatarManifest.ts';
+import type { AvatarManifest, ExpressionLayer } from './avatarManifest.ts';
 import {
-  applyExpression,
+  applyExpressionMix,
   createLive2DRuntime,
   destroyRuntime,
   resizeRuntime,
@@ -11,7 +11,7 @@ import {
 
 type Live2DStageProps = {
   avatar: AvatarManifest;
-  expression: ExpressionKey;
+  expressionMix: ExpressionLayer[];
   transform: StageTransform;
   onTransformChange: (transform: StageTransform) => void;
 };
@@ -30,7 +30,7 @@ function clamp(value: number, min: number, max: number) {
 
 export function Live2DStage({
   avatar,
-  expression,
+  expressionMix,
   transform,
   onTransformChange,
 }: Live2DStageProps) {
@@ -61,7 +61,7 @@ export function Live2DStage({
         }
 
         runtimeRef.current = runtime;
-        await applyExpression(runtime, avatar, 'neutral');
+        await applyExpressionMix(runtime, avatar, [{ key: 'neutral', weight: 1 }]);
         updateStageTransform(runtime, container, transformRef.current);
         setStatus('Ready');
       })
@@ -94,14 +94,15 @@ export function Live2DStage({
       return;
     }
 
-    setStatus(`Switching ${expression}`);
-    void applyExpression(runtimeRef.current, avatar, expression)
+    const summary = expressionMix.map((layer) => layer.key).join(' + ') || 'neutral';
+    setStatus(`Switching ${summary}`);
+    void applyExpressionMix(runtimeRef.current, avatar, expressionMix)
       .then(() => setStatus('Ready'))
       .catch((error) => {
         console.error(error);
         setStatus('Expression failed');
       });
-  }, [avatar, expression]);
+  }, [avatar, expressionMix]);
 
   useEffect(() => {
     if (!runtimeRef.current || !containerRef.current) {

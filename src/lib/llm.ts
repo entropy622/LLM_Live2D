@@ -1,16 +1,22 @@
-import type { AvatarManifest, ExpressionKey } from '../features/live2d/avatarManifest.ts';
+import type {
+  AvatarManifest,
+  ExpressionKey,
+  ExpressionLayer,
+} from '../features/live2d/avatarManifest.ts';
 
 export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   expression?: ExpressionKey;
+  expressionMix?: ExpressionLayer[];
   meta?: string;
 };
 
 export type AssistantResponse = {
   reply: string;
   expression: ExpressionKey;
+  expressionMix: ExpressionLayer[];
   intensity: number;
   durationMs: number;
   source: 'mock' | 'remote';
@@ -29,6 +35,12 @@ export type LlmSettings = {
   model: string;
 };
 
+type RawExpressionLayer = {
+  expression?: string;
+  key?: string;
+  weight?: number;
+};
+
 const llmSettingsStorageKey = 'llm-live2d:llm-settings';
 
 const allowedExpressions: ExpressionKey[] = [
@@ -44,15 +56,19 @@ const allowedExpressions: ExpressionKey[] = [
 ];
 
 const zhKeywords = {
-  happy: ['\u5f00\u5fc3', '\u9ad8\u5174', '\u559c\u6b22'],
-  sad: ['\u96be\u8fc7', '\u4f24\u5fc3', '\u54ed'],
-  angry: ['\u751f\u6c14', '\u6124\u6012', '\u706b\u5927'],
-  shy: ['\u5bb3\u7f9e', '\u8138\u7ea2', '\u559c\u6b22\u4f60'],
-  suspicious: ['\u53ef\u7591', '\u6000\u7591', '\u771f\u7684\u5417'],
-  surprised: ['\u9707\u60ca', '\u60ca\u8bb6', '\u4ec0\u4e48'],
-  embarrassed: ['\u5c34\u5c2c', '\u793e\u6b7b'],
-  playful: ['\u8c03\u76ae', '\u574f\u7b11', '\u5410\u820c'],
+  happy: ['开心', '高兴', '喜欢'],
+  sad: ['难过', '伤心', '哭'],
+  angry: ['生气', '愤怒', '火大'],
+  shy: ['害羞', '脸红', '喜欢你'],
+  suspicious: ['可疑', '怀疑', '真的假的', '不太对'],
+  surprised: ['震惊', '惊讶', '什么'],
+  embarrassed: ['尴尬', '社死'],
+  playful: ['调皮', '坏笑', '吐舌'],
 };
+
+function clampWeight(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
 
 function clampExpression(value: string, avatar: AvatarManifest): ExpressionKey {
   if (
@@ -67,6 +83,49 @@ function clampExpression(value: string, avatar: AvatarManifest): ExpressionKey {
 
 function stripMarkdownFence(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+}
+
+function sortExpressionMix(layers: ExpressionLayer[]) {
+  return [...layers].sort((left, right) => right.weight - left.weight);
+}
+
+export function normalizeExpressionMix(
+  avatar: AvatarManifest,
+  rawLayers: RawExpressionLayer[] | undefined,
+  fallbackExpression = 'neutral',
+): ExpressionLayer[] {
+  const layers = rawLayers
+    ?.map((layer) => {
+      const key = clampExpression(layer.expression ?? layer.key ?? fallbackExpression, avatar);
+      return {
+        key,
+        weight: clampWeight(layer.weight ?? 0),
+      };
+    })
+    .filter((layer) => layer.weight > 0.02);
+
+  const merged = new Map<ExpressionKey, number>();
+
+  for (const layer of layers ?? []) {
+    merged.set(layer.key, Math.min(1, (merged.get(layer.key) ?? 0) + layer.weight));
+  }
+
+  const normalized = sortExpressionMix(
+    [...merged.entries()].map(([key, weight]) => ({
+      key,
+      weight,
+    })),
+  ).slice(0, 3);
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  return [{ key: clampExpression(fallbackExpression, avatar), weight: 1 }];
+}
+
+export function getPrimaryExpression(expressionMix: ExpressionLayer[]): ExpressionKey {
+  return expressionMix[0]?.key ?? 'neutral';
 }
 
 export function getDefaultLlmSettings(): LlmSettings {
@@ -147,7 +206,7 @@ async function requestRemoteAssistant({
     },
     body: JSON.stringify({
       model,
-      temperature: 0.7,
+      temperature: 0.8,
       messages: [
         { role: 'system', content: systemPrompt },
         ...history.map((message) => ({
@@ -172,10 +231,19 @@ async function requestRemoteAssistant({
     return null;
   }
 
-  const parsed = JSON.parse(stripMarkdownFence(content)) as Partial<AssistantResponse>;
+  const parsed = JSON.parse(stripMarkdownFence(content)) as Partial<AssistantResponse> & {
+    expressionMix?: RawExpressionLayer[];
+  };
+  const expressionMix = normalizeExpressionMix(
+    avatar,
+    parsed.expressionMix,
+    parsed.expression ?? 'neutral',
+  );
+
   return {
     reply: parsed.reply ?? '...',
-    expression: clampExpression(parsed.expression ?? 'neutral', avatar),
+    expression: getPrimaryExpression(expressionMix),
+    expressionMix,
     intensity: parsed.intensity ?? 0.65,
     durationMs: parsed.durationMs ?? 2800,
     source: 'remote',
@@ -186,48 +254,91 @@ function includesOneOf(source: string, keywords: string[]) {
   return keywords.some((keyword) => source.includes(keyword));
 }
 
+function pushMix(
+  layers: Array<{ key: ExpressionKey; weight: number }>,
+  avatar: AvatarManifest,
+  key: ExpressionKey,
+  weight: number,
+) {
+  if (!avatar.expressions[key]) {
+    return;
+  }
+
+  layers.push({
+    key,
+    weight,
+  });
+}
+
 function mockAssistant(userInput: string, avatar: AvatarManifest): AssistantResponse {
   const text = userInput.toLowerCase();
-
-  let expression: ExpressionKey = 'neutral';
+  const layers: Array<{ key: ExpressionKey; weight: number }> = [];
   let reply =
-    'Mock mode is active. This stage is focused on validating the expression-control loop first.';
+    'Mock mode is active. This stage now supports blended expression control instead of one-hot switching.';
 
   if (includesOneOf(text, [...zhKeywords.happy, 'happy', 'love', 'great'])) {
-    expression = 'happy';
-    reply = 'This input maps well to a positive expression. The manifest should now switch to happy.';
-  } else if (includesOneOf(text, [...zhKeywords.sad, 'sad'])) {
-    expression = 'sad';
-    reply = 'This reads as a sad or vulnerable cue, so the controller selected sad.';
-  } else if (includesOneOf(text, [...zhKeywords.angry, 'angry', 'mad'])) {
-    expression = 'angry';
-    reply = 'This is a strong negative cue. Angry should be more informative than only changing the mouth.';
-  } else if (includesOneOf(text, [...zhKeywords.shy, 'shy'])) {
-    expression = 'shy';
-    reply = 'This should lean toward shy instead of happy, mainly to preserve blush and eye-shape differences.';
-  } else if (includesOneOf(text, [...zhKeywords.suspicious, 'suspicious'])) {
-    expression = 'suspicious';
-    reply = 'Suspicious is useful because it stress-tests asymmetry in brows, eyes, and mouth.';
-  } else if (includesOneOf(text, [...zhKeywords.surprised, 'surprised', 'wow'])) {
-    expression = 'surprised';
-    reply = 'The controller selected surprised for this input.';
-  } else if (includesOneOf(text, [...zhKeywords.embarrassed, 'embarrassed', 'awkward'])) {
-    expression = 'embarrassed';
-    reply = 'Embarrassed is intentionally separate from shy so the LLM can make a cleaner semantic choice.';
-  } else if (includesOneOf(text, [...zhKeywords.playful, 'playful', 'tease'])) {
-    expression = 'playful';
-    reply = 'Playful helps distinguish cheerful replies from smug or teasing ones.';
+    pushMix(layers, avatar, 'happy', 0.8);
   }
 
-  if (!avatar.expressions[expression]) {
-    expression = 'neutral';
+  if (includesOneOf(text, [...zhKeywords.sad, 'sad'])) {
+    pushMix(layers, avatar, 'sad', 0.8);
   }
+
+  if (includesOneOf(text, [...zhKeywords.angry, 'angry', 'mad'])) {
+    pushMix(layers, avatar, 'angry', 0.85);
+  }
+
+  if (includesOneOf(text, [...zhKeywords.shy, 'shy'])) {
+    pushMix(layers, avatar, 'shy', 0.7);
+  }
+
+  if (includesOneOf(text, [...zhKeywords.suspicious, 'suspicious'])) {
+    pushMix(layers, avatar, 'suspicious', 0.75);
+  }
+
+  if (includesOneOf(text, [...zhKeywords.surprised, 'surprised', 'wow'])) {
+    pushMix(layers, avatar, 'surprised', 0.8);
+  }
+
+  if (includesOneOf(text, [...zhKeywords.embarrassed, 'embarrassed', 'awkward'])) {
+    pushMix(layers, avatar, 'embarrassed', 0.65);
+  }
+
+  if (includesOneOf(text, [...zhKeywords.playful, 'playful', 'tease'])) {
+    pushMix(layers, avatar, 'playful', 0.6);
+  }
+
+  if (layers.length === 0) {
+    pushMix(layers, avatar, 'neutral', 1);
+  }
+
+  if (layers.some((layer) => layer.key === 'happy') && layers.some((layer) => layer.key === 'shy')) {
+    reply = 'This reads more like happy plus shy, so the controller is blending warmth with a restrained blush.';
+  } else if (
+    layers.some((layer) => layer.key === 'suspicious') &&
+    layers.some((layer) => layer.key === 'playful')
+  ) {
+    reply = 'This has a teasing but doubtful tone, so the controller is blending suspicious with playful.';
+  } else if (
+    layers.some((layer) => layer.key === 'sad') &&
+    layers.some((layer) => layer.key === 'embarrassed')
+  ) {
+    reply = 'This input feels vulnerable and awkward at the same time, so the controller is mixing sad with embarrassed.';
+  } else if (layers.some((layer) => layer.key === 'angry')) {
+    reply = 'This is a strong negative cue, so angry leads the blend instead of forcing a single hard switch.';
+  } else if (layers.some((layer) => layer.key === 'surprised')) {
+    reply = 'The controller detected surprise and can now mix it with secondary cues instead of flattening everything into one label.';
+  }
+
+  const expressionMix = normalizeExpressionMix(avatar, layers, 'neutral');
+  const expression = getPrimaryExpression(expressionMix);
 
   return {
     reply,
     expression,
-    intensity: expression === 'neutral' ? 0.4 : 0.7,
-    durationMs: 2800,
+    expressionMix,
+    intensity: expression === 'neutral' ? 0.4 : 0.75,
+    durationMs: 3200,
     source: 'mock',
   };
 }
@@ -237,8 +348,13 @@ export function createSystemPrompt(avatar: AvatarManifest) {
 
   return [
     `You are controlling the Live2D avatar ${avatar.name}.`,
-    `Choose exactly one expression from: ${available}.`,
-    'Return strict JSON with reply, expression, intensity, durationMs.',
+    `Available semantic expressions: ${available}.`,
+    'Choose one to three expressions and blend them when the tone is mixed.',
+    'Return strict JSON with reply, expressionMix, intensity, durationMs.',
+    'expressionMix must be an array of objects: {"expression":"happy","weight":0.72}.',
+    'Weights must be between 0 and 1.',
+    'Sort expressionMix from strongest to weakest.',
+    'If one expression is clearly dominant, it may still be the only item in the array.',
     'Do not return markdown or any extra explanation.',
   ].join('\n');
 }

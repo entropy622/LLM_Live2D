@@ -3,7 +3,7 @@ import { Live2DModel } from 'pixi-live2d-display/cubism4';
 import type {
   AvatarManifest,
   ExpressionBinding,
-  ExpressionKey,
+  ExpressionLayer,
 } from './avatarManifest.ts';
 
 declare global {
@@ -15,7 +15,7 @@ declare global {
 
 type RuntimeState = {
   model: Live2DModel;
-  activePreset: Record<string, number> | null;
+  activeParams: Map<string, number> | null;
   baselineParams: Map<string, number>;
   trackedParamIds: Set<string>;
   app: PIXI.Application;
@@ -23,6 +23,7 @@ type RuntimeState = {
   modelBaseWidth: number;
   modelBaseHeight: number;
   currentTransform: StageTransform;
+  resolvedBindingCache: Map<string, ResolvedBinding>;
 };
 
 export type StageTransform = {
@@ -35,6 +36,28 @@ type CubismCoreModel = {
   getParameterValueById(parameterId: string): number;
   setParameterValueById(parameterId: string, value: number, weight?: number): void;
 };
+
+type ExpressionFilePayload = {
+  Parameters?: Array<{
+    Id?: string;
+    Value?: number;
+    Blend?: 'Add' | 'Multiply' | 'Overwrite' | string;
+  }>;
+};
+
+type ResolvedBinding =
+  | {
+      mode: 'preset';
+      params: Record<string, number>;
+    }
+  | {
+      mode: 'file';
+      params: Array<{
+        id: string;
+        value: number;
+        blend: 'Add' | 'Multiply' | 'Overwrite';
+      }>;
+    };
 
 function getCoreModel(runtime: RuntimeState) {
   return runtime.model.internalModel.coreModel as CubismCoreModel;
@@ -101,25 +124,111 @@ function applyBaseline(runtime: RuntimeState) {
   }
 }
 
-function applyPreset(runtime: RuntimeState, binding: ExpressionBinding | undefined) {
-  const coreModel = getCoreModel(runtime);
-
-  if (!binding || binding.mode !== 'preset') {
-    runtime.activePreset = null;
-    applyBaseline(runtime);
+function ensureTrackedBaseline(runtime: RuntimeState, paramId: string) {
+  if (runtime.trackedParamIds.has(paramId)) {
     return;
   }
 
-  for (const [paramId, value] of Object.entries(binding.params)) {
-    if (!runtime.trackedParamIds.has(paramId)) {
-      runtime.trackedParamIds.add(paramId);
-      runtime.baselineParams.set(paramId, coreModel.getParameterValueById(paramId));
-    }
+  const coreModel = getCoreModel(runtime);
+  runtime.trackedParamIds.add(paramId);
+  runtime.baselineParams.set(paramId, coreModel.getParameterValueById(paramId));
+}
 
-    coreModel.setParameterValueById(paramId, value);
+function clampLayerWeight(weight: number) {
+  return Math.min(Math.max(weight, 0), 1);
+}
+
+function normalizeBlend(value: string | undefined): 'Add' | 'Multiply' | 'Overwrite' {
+  if (value === 'Multiply' || value === 'Overwrite') {
+    return value;
   }
 
-  runtime.activePreset = binding.params;
+  return 'Add';
+}
+
+function mixOverwrite(base: number, target: number, weight: number) {
+  return base + (target - base) * weight;
+}
+
+function mixMultiply(base: number, value: number, weight: number) {
+  const factor = 1 + (value - 1) * weight;
+  return base * factor;
+}
+
+async function resolveBinding(
+  runtime: RuntimeState,
+  binding: ExpressionBinding,
+): Promise<ResolvedBinding> {
+  if (binding.mode === 'preset') {
+    return {
+      mode: 'preset',
+      params: binding.params,
+    };
+  }
+
+  const cached = runtime.resolvedBindingCache.get(binding.file);
+  if (cached) {
+    return cached;
+  }
+
+  const payload = await fetchJson<ExpressionFilePayload>(binding.file);
+  const resolved: ResolvedBinding = {
+    mode: 'file',
+    params: (payload.Parameters ?? [])
+      .filter((parameter) => parameter.Id && typeof parameter.Value === 'number')
+      .map((parameter) => ({
+        id: parameter.Id!,
+        value: parameter.Value!,
+        blend: normalizeBlend(parameter.Blend),
+      })),
+  };
+
+  runtime.resolvedBindingCache.set(binding.file, resolved);
+  return resolved;
+}
+
+async function buildMixedParameters(
+  runtime: RuntimeState,
+  avatar: AvatarManifest,
+  expressionMix: ExpressionLayer[],
+) {
+  const nextParams = new Map<string, number>();
+
+  for (const layer of expressionMix) {
+    const binding = avatar.expressions[layer.key];
+    if (!binding) {
+      continue;
+    }
+
+    const resolved = await resolveBinding(runtime, binding);
+    const weight = clampLayerWeight(layer.weight);
+
+    if (resolved.mode === 'preset') {
+      for (const [paramId, value] of Object.entries(resolved.params)) {
+        ensureTrackedBaseline(runtime, paramId);
+        const baseline = runtime.baselineParams.get(paramId) ?? 0;
+        const current = nextParams.get(paramId) ?? baseline;
+        nextParams.set(paramId, mixOverwrite(current, value, weight));
+      }
+      continue;
+    }
+
+    for (const param of resolved.params) {
+      ensureTrackedBaseline(runtime, param.id);
+      const baseline = runtime.baselineParams.get(param.id) ?? 0;
+      const current = nextParams.get(param.id) ?? baseline;
+
+      if (param.blend === 'Overwrite') {
+        nextParams.set(param.id, mixOverwrite(current, param.value, weight));
+      } else if (param.blend === 'Multiply') {
+        nextParams.set(param.id, mixMultiply(current, param.value, weight));
+      } else {
+        nextParams.set(param.id, current + param.value * weight);
+      }
+    }
+  }
+
+  return nextParams;
 }
 
 function fitModel(runtime: RuntimeState, container: HTMLElement, transform?: StageTransform) {
@@ -174,7 +283,7 @@ export async function createLive2DRuntime(
 
   const runtime: RuntimeState = {
     model,
-    activePreset: null,
+    activeParams: null,
     baselineParams: new Map(),
     trackedParamIds: new Set(),
     app,
@@ -182,16 +291,17 @@ export async function createLive2DRuntime(
     modelBaseWidth,
     modelBaseHeight,
     currentTransform: avatar.transformDefaults,
+    resolvedBindingCache: new Map(),
   };
 
   app.ticker.add(() => {
-    if (!runtime.activePreset) {
+    if (!runtime.activeParams) {
       return;
     }
 
     const coreModel = getCoreModel(runtime);
 
-    for (const [paramId, value] of Object.entries(runtime.activePreset)) {
+    for (const [paramId, value] of runtime.activeParams.entries()) {
       coreModel.setParameterValueById(paramId, value);
     }
   });
@@ -200,20 +310,34 @@ export async function createLive2DRuntime(
   return runtime;
 }
 
-export async function applyExpression(
+export async function applyExpressionMix(
   runtime: RuntimeState,
   avatar: AvatarManifest,
-  expressionKey: ExpressionKey,
+  expressionMix: ExpressionLayer[],
 ) {
-  const binding = avatar.expressions[expressionKey];
-  applyPreset(runtime, binding);
+  runtime.model.internalModel.motionManager.expressionManager?.resetExpression();
 
-  if (!binding || binding.mode !== 'file') {
-    runtime.model.internalModel.motionManager.expressionManager?.resetExpression();
+  if (expressionMix.length === 0) {
+    runtime.activeParams = null;
+    applyBaseline(runtime);
     return;
   }
 
-  await runtime.model.expression(expressionKey);
+  const mixedParams = await buildMixedParameters(runtime, avatar, expressionMix);
+
+  if (mixedParams.size === 0) {
+    runtime.activeParams = null;
+    applyBaseline(runtime);
+    return;
+  }
+
+  runtime.activeParams = mixedParams;
+  applyBaseline(runtime);
+
+  const coreModel = getCoreModel(runtime);
+  for (const [paramId, value] of mixedParams.entries()) {
+    coreModel.setParameterValueById(paramId, value);
+  }
 }
 
 export function resizeRuntime(runtime: RuntimeState, container: HTMLElement) {

@@ -5,40 +5,57 @@ import {
   avatarList,
   avatars,
   type ExpressionKey,
+  type ExpressionLayer,
 } from './features/live2d/avatarManifest.ts';
 import {
   createAssistantResponse,
   createSystemPrompt,
   getDefaultLlmSettings,
+  getPrimaryExpression,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
   type AssistantResponse,
   type ChatMessage,
-  type LlmSettings
+  type LlmSettings,
 } from './lib/llm.ts';
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
+
+const neutralMix: ExpressionLayer[] = [{ key: 'neutral', weight: 1 }];
 
 const starterMessages: ChatMessage[] = [
   {
     id: crypto.randomUUID(),
     role: 'assistant',
-    content: 'The lab is ready. Send a prompt to test reply generation and expression switching.',
+    content:
+      'The lab is ready. Send a prompt to test reply generation and mixed-expression control.',
     expression: 'neutral',
+    expressionMix: neutralMix,
     meta: 'mock',
   },
 ];
+
+function formatExpressionMix(expressionMix: ExpressionLayer[]) {
+  return expressionMix
+    .map((layer) => `${EXPRESSION_LABELS[layer.key]} ${Math.round(layer.weight * 100)}%`)
+    .join(' + ');
+}
 
 export default function App() {
   const [selectedAvatarId, setSelectedAvatarId] = useState(avatarList[0].id);
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [activeExpression, setActiveExpression] = useState<ExpressionKey>('neutral');
+  const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(neutralMix);
   const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedAvatar = avatars[selectedAvatarId];
+  const activeExpression = getPrimaryExpression(activeExpressionMix);
+  const activeExpressionKeys = useMemo(
+    () => new Set(activeExpressionMix.map((layer) => layer.key)),
+    [activeExpressionMix],
+  );
   const [stageTransform, setStageTransform] = useState<StageTransform>(
     selectedAvatar.transformDefaults,
   );
@@ -82,7 +99,7 @@ export default function App() {
       });
 
       setLastDirective(response);
-      setActiveExpression(response.expression);
+      setActiveExpressionMix(response.expressionMix);
       setMessages((current) => [
         ...current,
         {
@@ -90,6 +107,7 @@ export default function App() {
           role: 'assistant',
           content: response.reply,
           expression: response.expression,
+          expressionMix: response.expressionMix,
           meta: response.source,
         },
       ]);
@@ -101,7 +119,7 @@ export default function App() {
   function handleAvatarChange(avatarId: string) {
     setSelectedAvatarId(avatarId);
     setStageTransform(avatars[avatarId].transformDefaults);
-    setActiveExpression('neutral');
+    setActiveExpressionMix(neutralMix);
     setLastDirective(null);
     setMessages([
       {
@@ -109,6 +127,7 @@ export default function App() {
         role: 'assistant',
         content: `Switched to ${avatars[avatarId].name}.`,
         expression: 'neutral',
+        expressionMix: neutralMix,
         meta: 'system',
       },
     ]);
@@ -161,7 +180,7 @@ export default function App() {
 
         <Live2DStage
           avatar={selectedAvatar}
-          expression={activeExpression}
+          expressionMix={activeExpressionMix}
           transform={stageTransform}
           onTransformChange={setStageTransform}
         />
@@ -217,7 +236,7 @@ export default function App() {
             {sortedExpressions.map((expression) => (
               <span
                 key={expression}
-                className={expression === activeExpression ? 'chip active readonly' : 'chip readonly'}
+                className={activeExpressionKeys.has(expression) ? 'chip active readonly' : 'chip readonly'}
               >
                 {EXPRESSION_LABELS[expression]}
               </span>
@@ -242,15 +261,15 @@ export default function App() {
             </button>
             <div className="directive-card">
               <p>{lastDirective?.source === 'remote' ? 'Remote LLM' : 'Local Mock'}</p>
-              <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? 'neutral']}</strong>
+              <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? activeExpression]}</strong>
             </div>
           </div>
         </div>
 
         <div className="directive-grid">
           <div className="directive-box">
-            <span>Expression</span>
-            <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? activeExpression]}</strong>
+            <span>Blend</span>
+            <strong>{formatExpressionMix(lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
           </div>
           <div className="directive-box">
             <span>Intensity</span>
@@ -270,7 +289,11 @@ export default function App() {
             >
               <header>
                 <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
-                {message.expression ? <span>{EXPRESSION_LABELS[message.expression]}</span> : null}
+                {message.expressionMix?.length ? (
+                  <span>{formatExpressionMix(message.expressionMix)}</span>
+                ) : message.expression ? (
+                  <span>{EXPRESSION_LABELS[message.expression]}</span>
+                ) : null}
               </header>
               <p>{message.content}</p>
               {message.meta ? <small>{message.meta}</small> : null}
@@ -282,7 +305,7 @@ export default function App() {
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Try: you look suspicious today, or: this is great news."
+            placeholder="Try: she sounds happy but a little shy, or: that's suspicious and kind of playful."
             rows={4}
           />
           <button type="submit" disabled={isSending}>
