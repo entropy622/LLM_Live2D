@@ -196,7 +196,7 @@ export const avatars: Record<string, AvatarManifest> = {
       idle2: { file: `${ellenFolder}/idle2.motion3.json` },
     },
     watermark: {
-      enabledByDefault: true,
+      enabledByDefault: false,
       binding: { mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` },
     },
   },
@@ -250,7 +250,7 @@ export const avatars: Record<string, AvatarManifest> = {
       idle: { file: `${strawberryFolder}/motion/Scene1.motion3.json` },
     },
     watermark: {
-      enabledByDefault: true,
+      enabledByDefault: false,
       binding: { mode: 'file', file: `${strawberryFolder}/expressions/\u6c34\u5370.exp3.json` },
     },
   },

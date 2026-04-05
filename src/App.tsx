@@ -206,7 +206,7 @@ export default function App() {
         <Live2DStage
           avatar={selectedAvatar}
           expressionMix={activeExpressionMix}
-          watermarkVisible={watermarkVisible}
+          watermarkVisible={!watermarkVisible}
           transform={stageTransform}
           onTransformChange={setStageTransform}
         />
@@ -250,6 +250,8 @@ export default function App() {
                 onChange={(event) => updateTransform({ offsetY: Number(event.target.value) })}
               />
             </label>
+          </div>
+          <div className="viewer-utility-row">
             <button
               type="button"
               className="reset-button"
@@ -257,17 +259,21 @@ export default function App() {
             >
               Reset Transform
             </button>
+            {selectedAvatar.watermark ? (
+              <button
+                type="button"
+                className={`watermark-toggle ${watermarkVisible ? 'is-active' : ''}`}
+                aria-pressed={watermarkVisible}
+                onClick={() => setWatermarkVisible((current) => !current)}
+              >
+                <span className="watermark-toggle-label">Watermark</span>
+                <span className="watermark-toggle-track" aria-hidden="true">
+                  <span className="watermark-toggle-thumb" />
+                </span>
+                <span className="watermark-toggle-state">{watermarkVisible ? 'On' : 'Off'}</span>
+              </button>
+            ) : null}
           </div>
-          {selectedAvatar.watermark ? (
-            <label className="toggle-field">
-              <span>Watermark</span>
-              <input
-                type="checkbox"
-                checked={watermarkVisible}
-                onChange={(event) => setWatermarkVisible(event.target.checked)}
-              />
-            </label>
-          ) : null}
           <div className="chip-row">
             {sortedExpressions.map((expression) => (
               <span
