@@ -3,7 +3,7 @@
     "Name": "yumi",
     "ModelID": "43e80658cfa947f2b9218e1110ad68ab",
     "FileReferences": {
-        "Icon": "yumi.png",
+        "Icon": "yumi.webp",
         "Model": "yumi.model3.json",
         "IdleAnimation": "tear.motion3.json",
         "IdleAnimationWhenTrackingLost": ""

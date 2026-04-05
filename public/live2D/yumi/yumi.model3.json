@@ -3,7 +3,7 @@
 	"FileReferences": {
 		"Moc": "yumi.moc3",
 		"Textures": [
-			"yumi.8192/texture_00.png"
+			"yumi.8192/texture_00.webp"
 		],
 		"Physics": "yumi.physics3.json",
 		"DisplayInfo": "yumi.cdi3.json"

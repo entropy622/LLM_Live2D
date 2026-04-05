@@ -3,7 +3,7 @@
     "Name": "兔子洞ldd",
     "ModelID": "fb5015c95e2e47fb95143d55d8f80203",
     "FileReferences": {
-        "Icon": "icon.png",
+        "Icon": "icon.webp",
         "Model": "兔子洞ldd.model3.json",
         "IdleAnimation": "",
         "IdleAnimationWhenTrackingLost": ""
