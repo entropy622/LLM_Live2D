@@ -5,6 +5,10 @@
 体验地址：
 `https://entropy622.github.io/LLM_Live2D/`
 
+## 项目灵感
+
+项目从 `Neuro Same` 中受到启发。`Neuro Same` 以及最近出的 `Airi` 中，LLM都不能生动的控制live2d模型的表情，于是有了这个实验项目。
+
 ## 当前能力
 
 - 左侧 Live2D，右侧对话面板
