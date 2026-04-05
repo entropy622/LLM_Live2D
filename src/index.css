@@ -233,6 +233,21 @@ button {
   font-size: 0.85rem;
 }
 
+.toggle-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #cabfae;
+  font-size: 0.9rem;
+}
+
+.toggle-field input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #d6a761;
+}
+
 .slider-field input[type='range'] {
   width: 100%;
   accent-color: #d6a761;

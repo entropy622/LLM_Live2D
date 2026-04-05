@@ -52,6 +52,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedAvatar = avatars[selectedAvatarId];
+  const [watermarkVisible, setWatermarkVisible] = useState(
+    selectedAvatar.watermark?.enabledByDefault ?? false,
+  );
   const activeExpression = getPrimaryExpression(activeExpressionMix);
   const activeExpressionKeys = useMemo(
     () => new Set(activeExpressionMix.map((layer) => layer.key)),
@@ -71,6 +74,10 @@ export default function App() {
   useEffect(() => {
     setLlmSettings(loadStoredLlmSettings());
   }, []);
+
+  useEffect(() => {
+    setWatermarkVisible(selectedAvatar.watermark?.enabledByDefault ?? false);
+  }, [selectedAvatar]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -199,6 +206,7 @@ export default function App() {
         <Live2DStage
           avatar={selectedAvatar}
           expressionMix={activeExpressionMix}
+          watermarkVisible={watermarkVisible}
           transform={stageTransform}
           onTransformChange={setStageTransform}
         />
@@ -250,6 +258,16 @@ export default function App() {
               Reset Transform
             </button>
           </div>
+          {selectedAvatar.watermark ? (
+            <label className="toggle-field">
+              <span>Watermark</span>
+              <input
+                type="checkbox"
+                checked={watermarkVisible}
+                onChange={(event) => setWatermarkVisible(event.target.checked)}
+              />
+            </label>
+          ) : null}
           <div className="chip-row">
             {sortedExpressions.map((expression) => (
               <span

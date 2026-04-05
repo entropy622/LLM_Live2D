@@ -24,6 +24,8 @@ type RuntimeState = {
   modelBaseHeight: number;
   currentTransform: StageTransform;
   resolvedBindingCache: Map<string, ResolvedBinding>;
+  expressionMix: ExpressionLayer[];
+  watermarkVisible: boolean;
 };
 
 export type StageTransform = {
@@ -35,6 +37,10 @@ export type StageTransform = {
 type CubismCoreModel = {
   getParameterValueById(parameterId: string): number;
   setParameterValueById(parameterId: string, value: number, weight?: number): void;
+};
+
+type FocusControllerLike = {
+  focus(x: number, y: number, instant?: boolean): void;
 };
 
 type ExpressionFilePayload = {
@@ -187,10 +193,45 @@ async function resolveBinding(
   return resolved;
 }
 
+async function mergeBindingIntoParameters(
+  runtime: RuntimeState,
+  nextParams: Map<string, number>,
+  binding: ExpressionBinding,
+  weight: number,
+) {
+  const resolved = await resolveBinding(runtime, binding);
+  const normalizedWeight = clampLayerWeight(weight);
+
+  if (resolved.mode === 'preset') {
+    for (const [paramId, value] of Object.entries(resolved.params)) {
+      ensureTrackedBaseline(runtime, paramId);
+      const baseline = runtime.baselineParams.get(paramId) ?? 0;
+      const current = nextParams.get(paramId) ?? baseline;
+      nextParams.set(paramId, mixOverwrite(current, value, normalizedWeight));
+    }
+    return;
+  }
+
+  for (const param of resolved.params) {
+    ensureTrackedBaseline(runtime, param.id);
+    const baseline = runtime.baselineParams.get(param.id) ?? 0;
+    const current = nextParams.get(param.id) ?? baseline;
+
+    if (param.blend === 'Overwrite') {
+      nextParams.set(param.id, mixOverwrite(current, param.value, normalizedWeight));
+    } else if (param.blend === 'Multiply') {
+      nextParams.set(param.id, mixMultiply(current, param.value, normalizedWeight));
+    } else {
+      nextParams.set(param.id, current + param.value * normalizedWeight);
+    }
+  }
+}
+
 async function buildMixedParameters(
   runtime: RuntimeState,
   avatar: AvatarManifest,
   expressionMix: ExpressionLayer[],
+  watermarkVisible: boolean,
 ) {
   const nextParams = new Map<string, number>();
 
@@ -200,32 +241,11 @@ async function buildMixedParameters(
       continue;
     }
 
-    const resolved = await resolveBinding(runtime, binding);
-    const weight = clampLayerWeight(layer.weight);
+    await mergeBindingIntoParameters(runtime, nextParams, binding, layer.weight);
+  }
 
-    if (resolved.mode === 'preset') {
-      for (const [paramId, value] of Object.entries(resolved.params)) {
-        ensureTrackedBaseline(runtime, paramId);
-        const baseline = runtime.baselineParams.get(paramId) ?? 0;
-        const current = nextParams.get(paramId) ?? baseline;
-        nextParams.set(paramId, mixOverwrite(current, value, weight));
-      }
-      continue;
-    }
-
-    for (const param of resolved.params) {
-      ensureTrackedBaseline(runtime, param.id);
-      const baseline = runtime.baselineParams.get(param.id) ?? 0;
-      const current = nextParams.get(param.id) ?? baseline;
-
-      if (param.blend === 'Overwrite') {
-        nextParams.set(param.id, mixOverwrite(current, param.value, weight));
-      } else if (param.blend === 'Multiply') {
-        nextParams.set(param.id, mixMultiply(current, param.value, weight));
-      } else {
-        nextParams.set(param.id, current + param.value * weight);
-      }
-    }
+  if (watermarkVisible && avatar.watermark) {
+    await mergeBindingIntoParameters(runtime, nextParams, avatar.watermark.binding, 1);
   }
 
   return nextParams;
@@ -249,11 +269,8 @@ function fitModel(runtime: RuntimeState, container: HTMLElement, transform?: Sta
   runtime.currentTransform = nextTransform;
 }
 
-function getIdleFocusPoint(runtime: RuntimeState) {
-  return {
-    x: runtime.model.x,
-    y: runtime.model.y - runtime.model.height * 0.58,
-  };
+function getFocusController(runtime: RuntimeState) {
+  return runtime.model.internalModel.focusController as FocusControllerLike;
 }
 
 export async function createLive2DRuntime(
@@ -299,6 +316,8 @@ export async function createLive2DRuntime(
     modelBaseHeight,
     currentTransform: avatar.transformDefaults,
     resolvedBindingCache: new Map(),
+    expressionMix: [],
+    watermarkVisible: avatar.watermark?.enabledByDefault ?? false,
   };
 
   app.ticker.add(() => {
@@ -314,8 +333,7 @@ export async function createLive2DRuntime(
   });
 
   fitModel(runtime, container);
-  const idleFocus = getIdleFocusPoint(runtime);
-  runtime.model.focus(idleFocus.x, idleFocus.y, true);
+  getFocusController(runtime).focus(0, 0, true);
   return runtime;
 }
 
@@ -324,15 +342,34 @@ export async function applyExpressionMix(
   avatar: AvatarManifest,
   expressionMix: ExpressionLayer[],
 ) {
+  runtime.expressionMix = expressionMix;
+  await applyRuntimeState(runtime, avatar);
+}
+
+export async function setWatermarkVisibility(
+  runtime: RuntimeState,
+  avatar: AvatarManifest,
+  watermarkVisible: boolean,
+) {
+  runtime.watermarkVisible = watermarkVisible;
+  await applyRuntimeState(runtime, avatar);
+}
+
+async function applyRuntimeState(runtime: RuntimeState, avatar: AvatarManifest) {
   runtime.model.internalModel.motionManager.expressionManager?.resetExpression();
 
-  if (expressionMix.length === 0) {
+  if (runtime.expressionMix.length === 0 && !(runtime.watermarkVisible && avatar.watermark)) {
     runtime.activeParams = null;
     applyBaseline(runtime);
     return;
   }
 
-  const mixedParams = await buildMixedParameters(runtime, avatar, expressionMix);
+  const mixedParams = await buildMixedParameters(
+    runtime,
+    avatar,
+    runtime.expressionMix,
+    runtime.watermarkVisible,
+  );
 
   if (mixedParams.size === 0) {
     runtime.activeParams = null;
@@ -369,8 +406,7 @@ export function focusRuntime(runtime: RuntimeState, container: HTMLElement, clie
 }
 
 export function resetRuntimeFocus(runtime: RuntimeState) {
-  const idleFocus = getIdleFocusPoint(runtime);
-  runtime.model.focus(idleFocus.x, idleFocus.y);
+  getFocusController(runtime).focus(0, 0);
 }
 
 export function destroyRuntime(runtime: RuntimeState) {

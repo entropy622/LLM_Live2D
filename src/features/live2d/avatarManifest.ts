@@ -31,6 +31,11 @@ export type MotionBinding = {
   group?: string;
 };
 
+export type WatermarkBinding = {
+  enabledByDefault: boolean;
+  binding: ExpressionBinding;
+};
+
 export type AvatarManifest = {
   id: string;
   name: string;
@@ -45,6 +50,7 @@ export type AvatarManifest = {
   };
   expressions: Partial<Record<ExpressionKey, ExpressionBinding>>;
   motions?: Record<string, MotionBinding>;
+  watermark?: WatermarkBinding;
 };
 
 export const EXPRESSION_LABELS: Record<ExpressionKey, string> = {
@@ -108,6 +114,8 @@ const rabbitFolder = publicAsset('live2D/\u5154\u5b50\u6d1e');
 const rabbitModel = `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`;
 const rabbitMotion = `${rabbitFolder}/motions`;
 
+const ellenFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u827e\u83b2');
+const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
 const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
 const huohuoFolder = publicAsset('live2D/\u85ff\u85ff');
 
@@ -141,6 +149,109 @@ export const avatars: Record<string, AvatarManifest> = {
     motions: {
       wave: { file: publicAsset('live2D/yumi/wave.motion3.json') },
       tear: { file: publicAsset('live2D/yumi/tear.motion3.json') },
+    },
+  },
+  ellen: {
+    id: 'ellen',
+    name: 'Ellen',
+    summary: 'High-quality cat-girl model by 神宫良子 with strong blush, shock, and playful accessory cues.',
+    modelJson: `${ellenFolder}/\u514d\u8d39\u6a21\u578b\u827e\u83b2.model3.json`,
+    scaleMultiplier: 0.31,
+    verticalOffset: 0.08,
+    transformDefaults: {
+      scale: 1.06,
+      offsetX: 0,
+      offsetY: 0,
+    },
+    expressions: {
+      neutral: {
+        mode: 'preset',
+        params: {
+          Paramlove8: 0,
+          Paramlove12: 0,
+          Paraexpmeiguihua2: 0,
+          Parammaoziexp50: 0,
+          Parammaoziexp55: 0,
+        },
+      },
+      happy: { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
+      sad: {
+        mode: 'preset',
+        params: {
+          ParamMouthForm: -0.35,
+          ParamEyeBallY: 0.2,
+          ParamBrowLY: -0.2,
+          ParamBrowRY: -0.2,
+        },
+      },
+      angry: { mode: 'file', file: `${ellenFolder}/black.exp3.json` },
+      shy: { mode: 'file', file: `${ellenFolder}/shou.exp3.json` },
+      suspicious: { mode: 'preset', params: suspiciousPreset },
+      surprised: { mode: 'file', file: `${ellenFolder}/shock.exp3.json` },
+      embarrassed: { mode: 'file', file: `${ellenFolder}/red.exp3.json` },
+      playful: { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
+    },
+    motions: {
+      idle: { file: `${ellenFolder}/idle.motion3.json` },
+      idle2: { file: `${ellenFolder}/idle2.motion3.json` },
+    },
+    watermark: {
+      enabledByDefault: true,
+      binding: { mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` },
+    },
+  },
+  strawberryBunny: {
+    id: 'strawberryBunny',
+    name: 'Strawberry Bunny',
+    summary: 'High-quality trial model by 糖糖锦鲤 with strong heart-eye, star-eye, blush, and dark-face accents.',
+    modelJson: `${strawberryFolder}/\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json`,
+    scaleMultiplier: 0.29,
+    verticalOffset: 0.08,
+    transformDefaults: {
+      scale: 0.98,
+      offsetX: 0,
+      offsetY: 0.01,
+    },
+    expressions: {
+      neutral: {
+        mode: 'preset',
+        params: {
+          Param2: 0,
+          Param3: 0,
+          Param6: 0,
+          Param7: 0,
+        },
+      },
+      happy: { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
+      sad: {
+        mode: 'preset',
+        params: {
+          ParamMouthForm: -0.35,
+          ParamEyeBallY: 0.12,
+          ParamBrowLY: -0.15,
+          ParamBrowRY: -0.15,
+        },
+      },
+      angry: { mode: 'file', file: `${strawberryFolder}/expressions/\u9ed1\u8138.exp3.json` },
+      shy: { mode: 'file', file: `${strawberryFolder}/expressions/\u7231\u5fc3.exp3.json` },
+      suspicious: { mode: 'preset', params: suspiciousPreset },
+      surprised: {
+        mode: 'preset',
+        params: {
+          ParamMouthOpenY: 0.8,
+          ParamEyeLOpen: 1.2,
+          ParamEyeROpen: 1.2,
+        },
+      },
+      embarrassed: { mode: 'file', file: `${strawberryFolder}/expressions/\u7ea2\u8138.exp3.json` },
+      playful: { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
+    },
+    motions: {
+      idle: { file: `${strawberryFolder}/motion/Scene1.motion3.json` },
+    },
+    watermark: {
+      enabledByDefault: true,
+      binding: { mode: 'file', file: `${strawberryFolder}/expressions/\u6c34\u5370.exp3.json` },
     },
   },
   rabbitHole: {

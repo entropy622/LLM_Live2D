@@ -1,0 +1,70 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "免费模型艾莲.moc3",
+		"Textures": [
+			"免费模型艾莲.4096/texture_00.webp",
+			"免费模型艾莲.4096/texture_01.webp",
+			"免费模型艾莲.4096/texture_02.webp"
+		],
+		"Physics": "免费模型艾莲.physics3.json",
+		"DisplayInfo": "免费模型艾莲.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "black",
+				"File": "black.exp3.json"
+			},
+			{
+				"Name": "red",
+				"File": "red.exp3.json"
+			},
+			{
+				"Name": "shock",
+				"File": "shock.exp3.json"
+			},
+			{
+				"Name": "shou",
+				"File": "shou.exp3.json"
+			},
+			{
+				"Name": "shuiyin",
+				"File": "shuiyin.exp3.json"
+			},
+			{
+				"Name": "tang",
+				"File": "tang.exp3.json"
+			}
+		],
+		"Motions": {
+			"": [
+				{
+					"File": "idle.motion3.json"
+				},
+				{
+					"File": "idle2.motion3.json"
+				}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"Param13",
+				"Param14",
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthForm",
+				"ParamMouthOpenY"
+			]
+		}
+	],
+	"HitAreas": []
+}

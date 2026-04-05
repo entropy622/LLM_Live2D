@@ -7,6 +7,7 @@ import {
   focusRuntime,
   resetRuntimeFocus,
   resizeRuntime,
+  setWatermarkVisibility,
   updateStageTransform,
   type StageTransform,
 } from './live2dEngine.ts';
@@ -14,6 +15,7 @@ import {
 type Live2DStageProps = {
   avatar: AvatarManifest;
   expressionMix: ExpressionLayer[];
+  watermarkVisible: boolean;
   transform: StageTransform;
   onTransformChange: (transform: StageTransform) => void;
 };
@@ -33,18 +35,24 @@ function clamp(value: number, min: number, max: number) {
 export function Live2DStage({
   avatar,
   expressionMix,
+  watermarkVisible,
   transform,
   onTransformChange,
 }: Live2DStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<Awaited<ReturnType<typeof createLive2DRuntime>> | null>(null);
   const transformRef = useRef(transform);
+  const watermarkVisibleRef = useRef(watermarkVisible);
   const dragStateRef = useRef<DragState | null>(null);
   const [status, setStatus] = useState('Loading');
 
   useEffect(() => {
     transformRef.current = transform;
   }, [transform]);
+
+  useEffect(() => {
+    watermarkVisibleRef.current = watermarkVisible;
+  }, [watermarkVisible]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -64,6 +72,7 @@ export function Live2DStage({
 
         runtimeRef.current = runtime;
         await applyExpressionMix(runtime, avatar, [{ key: 'neutral', weight: 1 }]);
+        await setWatermarkVisibility(runtime, avatar, watermarkVisibleRef.current);
         updateStageTransform(runtime, container, transformRef.current);
         setStatus('Ready');
       })
@@ -105,6 +114,17 @@ export function Live2DStage({
         setStatus('Expression failed');
       });
   }, [avatar, expressionMix]);
+
+  useEffect(() => {
+    if (!runtimeRef.current) {
+      return;
+    }
+
+    void setWatermarkVisibility(runtimeRef.current, avatar, watermarkVisible).catch((error) => {
+      console.error(error);
+      setStatus('Watermark failed');
+    });
+  }, [avatar, watermarkVisible]);
 
   useEffect(() => {
     if (!runtimeRef.current || !containerRef.current) {

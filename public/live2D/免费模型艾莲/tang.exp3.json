@@ -1,0 +1,45 @@
+{
+	"Type": "Live2D Expression",
+	"Parameters": [
+		{
+			"Id": "Parammaoziexp55",
+			"Value": 30,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamMouthPuckerWiden",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamCheeckPuff",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamJawX",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamMouthShrug",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamJawOpen",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamMouthPressLipOpen",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamMouthFunnel",
+			"Value": 0,
+			"Blend": "Add"
+		}
+	]
+}
