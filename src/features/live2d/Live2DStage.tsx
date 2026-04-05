@@ -4,6 +4,8 @@ import {
   applyExpressionMix,
   createLive2DRuntime,
   destroyRuntime,
+  focusRuntime,
+  resetRuntimeFocus,
   resizeRuntime,
   updateStageTransform,
   type StageTransform,
@@ -132,8 +134,17 @@ export function Live2DStage({
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const container = containerRef.current;
+    const runtime = runtimeRef.current;
     const dragState = dragStateRef.current;
-    if (!container || !dragState || dragState.pointerId !== event.pointerId) {
+    if (!container) {
+      return;
+    }
+
+    if (runtime && (event.pointerType === 'mouse' || event.pointerType === 'pen')) {
+      focusRuntime(runtime, container, event.clientX, event.clientY);
+    }
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
     }
 
@@ -170,6 +181,12 @@ export function Live2DStage({
     setStatus('Ready');
   }
 
+  function handlePointerLeave() {
+    if (runtimeRef.current) {
+      resetRuntimeFocus(runtimeRef.current);
+    }
+  }
+
   return (
     <div
       className="stage-shell"
@@ -177,9 +194,10 @@ export function Live2DStage({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
     >
       <div ref={containerRef} className="stage-canvas" />
-      <div className="stage-hint">Drag to move. Hold Shift and drag to scale.</div>
+      <div className="stage-hint">Move mouse to guide gaze. Drag to move. Hold Shift and drag to scale.</div>
       <div className="stage-status">{status}</div>
     </div>
   );

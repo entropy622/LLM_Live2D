@@ -249,6 +249,13 @@ function fitModel(runtime: RuntimeState, container: HTMLElement, transform?: Sta
   runtime.currentTransform = nextTransform;
 }
 
+function getIdleFocusPoint(runtime: RuntimeState) {
+  return {
+    x: runtime.model.x,
+    y: runtime.model.y - runtime.model.height * 0.58,
+  };
+}
+
 export async function createLive2DRuntime(
   container: HTMLElement,
   avatar: AvatarManifest,
@@ -307,6 +314,8 @@ export async function createLive2DRuntime(
   });
 
   fitModel(runtime, container);
+  const idleFocus = getIdleFocusPoint(runtime);
+  runtime.model.focus(idleFocus.x, idleFocus.y, true);
   return runtime;
 }
 
@@ -350,6 +359,18 @@ export function updateStageTransform(
   transform: StageTransform,
 ) {
   fitModel(runtime, container, transform);
+}
+
+export function focusRuntime(runtime: RuntimeState, container: HTMLElement, clientX: number, clientY: number) {
+  const rect = container.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  runtime.model.focus(x, y);
+}
+
+export function resetRuntimeFocus(runtime: RuntimeState) {
+  const idleFocus = getIdleFocusPoint(runtime);
+  runtime.model.focus(idleFocus.x, idleFocus.y);
 }
 
 export function destroyRuntime(runtime: RuntimeState) {
