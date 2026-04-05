@@ -21,6 +21,7 @@ import {
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
 const neutralMix: ExpressionLayer[] = [{ key: 'neutral', weight: 1 }];
+const repositoryUrl = 'https://github.com/entropy622/LLM_Live2D';
 
 const starterMessages: ChatMessage[] = [
   {
@@ -163,19 +164,36 @@ export default function App() {
             <p className="eyebrow">Live2D Lab</p>
             <h1>LLM x Expression Control</h1>
           </div>
-          <label className="field">
-            <span>Avatar</span>
-            <select
-              value={selectedAvatarId}
-              onChange={(event) => handleAvatarChange(event.target.value)}
+          <div className="viewer-header-actions">
+            <label className="field">
+              <span>Avatar</span>
+              <select
+                value={selectedAvatarId}
+                onChange={(event) => handleAvatarChange(event.target.value)}
+              >
+                {avatarList.map((avatar) => (
+                  <option key={avatar.id} value={avatar.id}>
+                    {avatar.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <a
+              className="github-link"
+              href={repositoryUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open GitHub repository"
+              title="Open GitHub repository"
             >
-              {avatarList.map((avatar) => (
-                <option key={avatar.id} value={avatar.id}>
-                  {avatar.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2C6.48 2 2 6.58 2 12.22c0 4.5 2.87 8.31 6.84 9.66.5.1.68-.22.68-.5 0-.24-.01-1.04-.01-1.88-2.78.62-3.37-1.21-3.37-1.21-.45-1.2-1.11-1.51-1.11-1.51-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.05 0-1.12.39-2.03 1.03-2.75-.11-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.84c.85 0 1.7.12 2.5.36 1.9-1.33 2.74-1.05 2.74-1.05.56 1.42.22 2.47.11 2.73.64.72 1.03 1.63 1.03 2.75 0 3.92-2.35 4.79-4.59 5.04.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.5A10.2 10.2 0 0 0 22 12.22C22 6.58 17.52 2 12 2Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </a>
+          </div>
         </div>
 
         <Live2DStage

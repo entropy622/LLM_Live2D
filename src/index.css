@@ -99,6 +99,42 @@ button {
   line-height: 1.05;
 }
 
+.viewer-header-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.github-link {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ece5d8;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-bottom: 1px;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.github-link:hover {
+  transform: translateY(-1px);
+  background: rgba(214, 167, 97, 0.12);
+  border-color: rgba(214, 167, 97, 0.32);
+  color: #f8efdf;
+}
+
+.github-link svg {
+  width: 20px;
+  height: 20px;
+}
+
 .eyebrow,
 .section-label {
   margin: 0;
@@ -470,6 +506,12 @@ button {
 
   .panel-header {
     flex-direction: column;
+  }
+
+  .viewer-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    align-items: flex-end;
   }
 
   .field,
