@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { Live2DModel } from 'pixi-live2d-display/cubism4';
 import type {
   AvatarManifest,
+  AvatarExpression,
   ExpressionBinding,
   ExpressionLayer,
 } from './avatarManifest.ts';
@@ -87,11 +88,11 @@ function createAugmentedSettings(
     ...(settings.FileReferences as Record<string, unknown> | undefined),
   };
 
-  const expressions = Object.entries(avatar.expressions)
-    .filter(([, binding]) => binding?.mode === 'file')
-    .map(([name, binding]) => ({
-      Name: name,
-      File: toRelativeAssetPath(avatar.modelJson, (binding as { file: string }).file),
+  const expressions = avatar.expressions
+    .filter((expressionItem) => expressionItem.binding.mode === 'file')
+    .map((expressionItem) => ({
+      Name: expressionItem.id,
+      File: toRelativeAssetPath(avatar.modelJson, (expressionItem.binding as { file: string }).file),
     }));
 
   if (expressions.length > 0) {
@@ -234,14 +235,17 @@ async function buildMixedParameters(
   watermarkVisible: boolean,
 ) {
   const nextParams = new Map<string, number>();
+  const expressionMap = new Map<string, AvatarExpression>(
+    avatar.expressions.map((expressionItem) => [expressionItem.id, expressionItem]),
+  );
 
   for (const layer of expressionMix) {
-    const binding = avatar.expressions[layer.key];
-    if (!binding) {
+    const expressionItem = expressionMap.get(layer.key);
+    if (!expressionItem) {
       continue;
     }
 
-    await mergeBindingIntoParameters(runtime, nextParams, binding, layer.weight);
+    await mergeBindingIntoParameters(runtime, nextParams, expressionItem.binding, layer.weight);
   }
 
   if (watermarkVisible && avatar.watermark) {

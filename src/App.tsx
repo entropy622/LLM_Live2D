@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
-  EXPRESSION_LABELS,
   avatarList,
   avatars,
-  type ExpressionKey,
+  getAvatarExpressionLabel,
+  getAvatarNeutralExpressionId,
   type ExpressionLayer,
 } from './features/live2d/avatarManifest.ts';
 import {
@@ -20,8 +20,12 @@ import {
 } from './lib/llm.ts';
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
-const neutralMix: ExpressionLayer[] = [{ key: 'neutral', weight: 1 }];
 const repositoryUrl = 'https://github.com/entropy622/LLM_Live2D';
+const defaultAvatarId = avatarList[0].id;
+
+function createNeutralMix(avatarId: string): ExpressionLayer[] {
+  return [{ key: getAvatarNeutralExpressionId(avatars[avatarId]), weight: 1 }];
+}
 
 const starterMessages: ChatMessage[] = [
   {
@@ -29,24 +33,29 @@ const starterMessages: ChatMessage[] = [
     role: 'assistant',
     content:
       'The lab is ready. Send a prompt to test reply generation and mixed-expression control.',
-    expression: 'neutral',
-    expressionMix: neutralMix,
+    expression: getAvatarNeutralExpressionId(avatars[defaultAvatarId]),
+    expressionMix: createNeutralMix(defaultAvatarId),
     meta: 'mock',
   },
 ];
 
-function formatExpressionMix(expressionMix: ExpressionLayer[]) {
+function formatExpressionMix(avatarId: string, expressionMix: ExpressionLayer[]) {
   return expressionMix
-    .map((layer) => `${EXPRESSION_LABELS[layer.key]} ${Math.round(layer.weight * 100)}%`)
+    .map(
+      (layer) =>
+        `${getAvatarExpressionLabel(avatars[avatarId], layer.key)} ${Math.round(layer.weight * 100)}%`,
+    )
     .join(' + ');
 }
 
 export default function App() {
-  const [selectedAvatarId, setSelectedAvatarId] = useState(avatarList[0].id);
+  const [selectedAvatarId, setSelectedAvatarId] = useState(defaultAvatarId);
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(neutralMix);
+  const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(
+    createNeutralMix(defaultAvatarId),
+  );
   const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -55,7 +64,7 @@ export default function App() {
   const [watermarkVisible, setWatermarkVisible] = useState(
     selectedAvatar.watermark?.enabledByDefault ?? false,
   );
-  const activeExpression = getPrimaryExpression(activeExpressionMix);
+  const activeExpression = getPrimaryExpression(selectedAvatar, activeExpressionMix);
   const activeExpressionKeys = useMemo(
     () => new Set(activeExpressionMix.map((layer) => layer.key)),
     [activeExpressionMix],
@@ -63,13 +72,7 @@ export default function App() {
   const [stageTransform, setStageTransform] = useState<StageTransform>(
     selectedAvatar.transformDefaults,
   );
-  const sortedExpressions = useMemo(
-    () =>
-      Object.keys(selectedAvatar.expressions).sort((left, right) =>
-        left === 'neutral' ? -1 : right === 'neutral' ? 1 : left.localeCompare(right),
-      ) as ExpressionKey[],
-    [selectedAvatar],
-  );
+  const visibleExpressions = selectedAvatar.expressions;
 
   useEffect(() => {
     setLlmSettings(loadStoredLlmSettings());
@@ -125,6 +128,7 @@ export default function App() {
   }
 
   function handleAvatarChange(avatarId: string) {
+    const neutralMix = createNeutralMix(avatarId);
     setSelectedAvatarId(avatarId);
     setStageTransform(avatars[avatarId].transformDefaults);
     setActiveExpressionMix(neutralMix);
@@ -134,7 +138,7 @@ export default function App() {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: `Switched to ${avatars[avatarId].name}.`,
-        expression: 'neutral',
+        expression: getAvatarNeutralExpressionId(avatars[avatarId]),
         expressionMix: neutralMix,
         meta: 'system',
       },
@@ -275,12 +279,12 @@ export default function App() {
             ) : null}
           </div>
           <div className="chip-row">
-            {sortedExpressions.map((expression) => (
+            {visibleExpressions.map((expression) => (
               <span
-                key={expression}
-                className={activeExpressionKeys.has(expression) ? 'chip active readonly' : 'chip readonly'}
+                key={expression.id}
+                className={activeExpressionKeys.has(expression.id) ? 'chip active readonly' : 'chip readonly'}
               >
-                {EXPRESSION_LABELS[expression]}
+                {expression.label}
               </span>
             ))}
           </div>
@@ -301,17 +305,13 @@ export default function App() {
             >
               LLM Settings
             </button>
-            <div className="directive-card">
-              <p>{lastDirective?.source === 'remote' ? 'Remote LLM' : 'Local Mock'}</p>
-              <strong>{EXPRESSION_LABELS[lastDirective?.expression ?? activeExpression]}</strong>
-            </div>
           </div>
         </div>
 
         <div className="directive-grid">
           <div className="directive-box">
             <span>Blend</span>
-            <strong>{formatExpressionMix(lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
+            <strong>{formatExpressionMix(selectedAvatarId, lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
           </div>
           <div className="directive-box">
             <span>Intensity</span>
@@ -332,9 +332,9 @@ export default function App() {
               <header>
                 <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
                 {message.expressionMix?.length ? (
-                  <span>{formatExpressionMix(message.expressionMix)}</span>
+                  <span>{formatExpressionMix(selectedAvatarId, message.expressionMix)}</span>
                 ) : message.expression ? (
-                  <span>{EXPRESSION_LABELS[message.expression]}</span>
+                  <span>{getAvatarExpressionLabel(selectedAvatar, message.expression)}</span>
                 ) : null}
               </header>
               <p>{message.content}</p>

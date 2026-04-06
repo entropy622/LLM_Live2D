@@ -1,16 +1,7 @@
-export type ExpressionKey =
-  | 'neutral'
-  | 'happy'
-  | 'sad'
-  | 'angry'
-  | 'shy'
-  | 'suspicious'
-  | 'surprised'
-  | 'embarrassed'
-  | 'playful';
+export type ExpressionId = string;
 
 export type ExpressionLayer = {
-  key: ExpressionKey;
+  key: ExpressionId;
   weight: number;
 };
 
@@ -25,6 +16,14 @@ type ExpressionPresetBinding = {
 };
 
 export type ExpressionBinding = ExpressionFileBinding | ExpressionPresetBinding;
+
+export type AvatarExpression = {
+  id: ExpressionId;
+  label: string;
+  prompt: string;
+  binding: ExpressionBinding;
+  aliases?: string[];
+};
 
 export type MotionBinding = {
   file: string;
@@ -48,66 +47,29 @@ export type AvatarManifest = {
     offsetX: number;
     offsetY: number;
   };
-  expressions: Partial<Record<ExpressionKey, ExpressionBinding>>;
+  expressions: AvatarExpression[];
   motions?: Record<string, MotionBinding>;
   watermark?: WatermarkBinding;
 };
 
-export const EXPRESSION_LABELS: Record<ExpressionKey, string> = {
-  neutral: 'Neutral',
-  happy: 'Happy',
-  sad: 'Sad',
-  angry: 'Angry',
-  shy: 'Shy',
-  suspicious: 'Suspicious',
-  surprised: 'Surprised',
-  embarrassed: 'Embarrassed',
-  playful: 'Playful',
-};
-
-const genericCutePreset = {
-  ParamMouthForm: 0.35,
-  ParamMouthOpenY: 0.02,
-  ParamCheek: 0.25,
-  ParamEyeLOpen: 1,
-  ParamEyeROpen: 1,
-  ParamEyeLSmile: 0.4,
-  ParamEyeRSmile: 0.4,
-};
-
-const suspiciousPreset = {
-  ParamMouthForm: -0.25,
-  ParamBrowLAngle: -0.4,
-  ParamBrowRAngle: 0.4,
-  ParamBrowLY: -0.2,
-  ParamBrowRY: 0.2,
-  ParamEyeBallX: 0.35,
-};
-
-const rabbitSuspiciousPreset = {
-  ParamMouthForm: -0.35,
-  ParamMouthX: 0.2,
-  ParamBrowLForm: -0.4,
-  ParamBrowRForm: -0.4,
-  ParamBrowLAngle: -0.2,
-  ParamBrowRAngle: 0.2,
-};
-
-const fuxuanNeutral = {
-  Param101: 0,
-  Param104: 0,
-  Param109: 0,
-  Param130: 0,
-  ParamEyeLSmile: 0,
-  ParamEyeRSmile: 0,
-  ParamMouthForm: 0,
-  ParamMouthOpenY: 0,
-  ParamBrowLForm: 0,
-  ParamBrowRForm: 0,
-};
-
 function publicAsset(assetPath: string) {
   return `${import.meta.env.BASE_URL}${assetPath.replace(/^\/+/, '')}`;
+}
+
+function expression(
+  id: ExpressionId,
+  label: string,
+  prompt: string,
+  binding: ExpressionBinding,
+  aliases: string[] = [],
+): AvatarExpression {
+  return {
+    id,
+    label,
+    prompt,
+    binding,
+    aliases,
+  };
 }
 
 const rabbitFolder = publicAsset('live2D/\u5154\u5b50\u6d1e');
@@ -132,20 +94,74 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0,
     },
-    expressions: {
-      neutral: {
-        mode: 'preset',
-        params: { Paramheilian: 0, Paramheart: 0, Paramleiwangwang: 0, Paramxingxing: 0 },
-      },
-      happy: { mode: 'file', file: publicAsset('live2D/yumi/\u661f\u661f\u773c.exp3.json') },
-      sad: { mode: 'file', file: publicAsset('live2D/yumi/\u6cea\u6c6a\u6c6a.exp3.json') },
-      angry: { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
-      shy: { mode: 'file', file: publicAsset('live2D/yumi/\u7231\u5fc3\u773c.exp3.json') },
-      suspicious: { mode: 'file', file: publicAsset('live2D/yumi/\u6b6a\u5634.exp3.json') },
-      surprised: { mode: 'file', file: publicAsset('live2D/yumi/\u868a\u9999\u773c.exp3.json') },
-      embarrassed: { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
-      playful: { mode: 'file', file: publicAsset('live2D/yumi/\u732b\u732b\u5634.exp3.json') },
-    },
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face with no extra expression layers',
+        {
+          mode: 'preset',
+          params: { Paramheilian: 0, Paramheart: 0, Paramleiwangwang: 0, Paramxingxing: 0 },
+        },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+      expression(
+        'starry_eyes',
+        'Starry Eyes',
+        'bright delighted star eyes',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u661f\u661f\u773c.exp3.json') },
+        ['happy', 'excited', 'delighted', 'star', 'starry', '\u5f00\u5fc3', '\u6fc0\u52a8'],
+      ),
+      expression(
+        'teary_eyes',
+        'Teary Eyes',
+        'sad watery eyes close to crying',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u6cea\u6c6a\u6c6a.exp3.json') },
+        ['sad', 'cry', 'teary', 'upset', '\u96be\u8fc7', '\u60f3\u54ed'],
+      ),
+      expression(
+        'heart_eyes',
+        'Heart Eyes',
+        'adoring heart-shaped eyes',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u7231\u5fc3\u773c.exp3.json') },
+        ['love', 'adoring', 'crush', 'heart', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
+      ),
+      expression(
+        'crooked_mouth',
+        'Crooked Mouth',
+        'skeptical or smug crooked-mouth expression',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u6b6a\u5634.exp3.json') },
+        ['suspicious', 'skeptical', 'doubtful', 'smug', '\u6000\u7591', '\u53ef\u7591'],
+      ),
+      expression(
+        'dizzy_eyes',
+        'Dizzy Eyes',
+        'spiral eyes for shock, dizziness, or dazed surprise',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u868a\u9999\u773c.exp3.json') },
+        ['surprised', 'dizzy', 'shocked', 'dazed', 'wow', '\u60ca\u8bb6', '\u6655'],
+      ),
+      expression(
+        'cat_mouth',
+        'Cat Mouth',
+        'playful teasing cat-mouth expression',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u732b\u732b\u5634.exp3.json') },
+        ['playful', 'teasing', 'mischievous', 'cat', '\u8c03\u76ae', '\u6076\u4f5c\u5267'],
+      ),
+      expression(
+        'tongue_out',
+        'Tongue Out',
+        'silly tongue-out teasing face',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u820c\u5934\u4f38\u51fa.exp3.json') },
+        ['tongue', 'silly', 'goofy', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
+      ),
+      expression(
+        'dark_face',
+        'Dark Face',
+        'dark-faced angry or intense mood',
+        { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
+        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
+      ),
+    ],
     motions: {
       wave: { file: publicAsset('live2D/yumi/wave.motion3.json') },
       tear: { file: publicAsset('live2D/yumi/tear.motion3.json') },
@@ -154,7 +170,7 @@ export const avatars: Record<string, AvatarManifest> = {
   ellen: {
     id: 'ellen',
     name: 'Ellen',
-    summary: 'High-quality cat-girl model by 神宫良子 with strong blush, shock, and playful accessory cues.',
+    summary: 'High-quality cat-girl model by 绁炲鑹瓙 with strong blush, shock, and playful accessory cues.',
     modelJson: `${ellenFolder}/\u514d\u8d39\u6a21\u578b\u827e\u83b2.model3.json`,
     scaleMultiplier: 0.31,
     verticalOffset: 0.08,
@@ -163,34 +179,59 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0,
     },
-    expressions: {
-      neutral: {
-        mode: 'preset',
-        params: {
-          Paramlove8: 0,
-          Paramlove12: 0,
-          Paraexpmeiguihua2: 0,
-          Parammaoziexp50: 0,
-          Parammaoziexp55: 0,
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face with no extra decorative expressions',
+        {
+          mode: 'preset',
+          params: {
+            Paramlove8: 0,
+            Paramlove12: 0,
+            Paraexpmeiguihua2: 0,
+            Parammaoziexp50: 0,
+            Parammaoziexp55: 0,
+          },
         },
-      },
-      happy: { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
-      sad: {
-        mode: 'preset',
-        params: {
-          ParamMouthForm: -0.35,
-          ParamEyeBallY: 0.2,
-          ParamBrowLY: -0.2,
-          ParamBrowRY: -0.2,
-        },
-      },
-      angry: { mode: 'file', file: `${ellenFolder}/black.exp3.json` },
-      shy: { mode: 'file', file: `${ellenFolder}/shou.exp3.json` },
-      suspicious: { mode: 'preset', params: suspiciousPreset },
-      surprised: { mode: 'file', file: `${ellenFolder}/shock.exp3.json` },
-      embarrassed: { mode: 'file', file: `${ellenFolder}/red.exp3.json` },
-      playful: { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
-    },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+      expression(
+        'tongue_out',
+        'Tongue Out',
+        'playful tongue-out expression',
+        { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
+        ['playful', 'tongue', 'teasing', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
+      ),
+      expression(
+        'dark_face',
+        'Dark Face',
+        'dark-faced angry mood',
+        { mode: 'file', file: `${ellenFolder}/black.exp3.json` },
+        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
+      ),
+      expression(
+        'shy_hand',
+        'Shy Hand',
+        'shy pose with clear affectionate restraint',
+        { mode: 'file', file: `${ellenFolder}/shou.exp3.json` },
+        ['shy', 'bashful', 'timid', '\u5bb3\u7f9e', '\u7f9e\u601d'],
+      ),
+      expression(
+        'shock',
+        'Shock',
+        'clear shocked or startled reaction',
+        { mode: 'file', file: `${ellenFolder}/shock.exp3.json` },
+        ['surprised', 'shock', 'startled', 'wow', '\u60ca\u8bb6', '\u9707\u60ca'],
+      ),
+      expression(
+        'blush',
+        'Blush',
+        'embarrassed blushing face',
+        { mode: 'file', file: `${ellenFolder}/red.exp3.json` },
+        ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
+      ),
+    ],
     motions: {
       idle: { file: `${ellenFolder}/idle.motion3.json` },
       idle2: { file: `${ellenFolder}/idle2.motion3.json` },
@@ -203,7 +244,7 @@ export const avatars: Record<string, AvatarManifest> = {
   strawberryBunny: {
     id: 'strawberryBunny',
     name: 'Strawberry Bunny',
-    summary: 'High-quality trial model by 糖糖锦鲤 with strong heart-eye, star-eye, blush, and dark-face accents.',
+    summary: 'High-quality trial model by 绯栫硸閿﹂菠 with strong heart-eye, star-eye, blush, and dark-face accents.',
     modelJson: `${strawberryFolder}/\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json`,
     scaleMultiplier: 0.29,
     verticalOffset: 0.08,
@@ -212,40 +253,51 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0.01,
     },
-    expressions: {
-      neutral: {
-        mode: 'preset',
-        params: {
-          Param2: 0,
-          Param3: 0,
-          Param6: 0,
-          Param7: 0,
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face with no extra trial expression overlays',
+        {
+          mode: 'preset',
+          params: {
+            Param2: 0,
+            Param3: 0,
+            Param6: 0,
+            Param7: 0,
+          },
         },
-      },
-      happy: { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
-      sad: {
-        mode: 'preset',
-        params: {
-          ParamMouthForm: -0.35,
-          ParamEyeBallY: 0.12,
-          ParamBrowLY: -0.15,
-          ParamBrowRY: -0.15,
-        },
-      },
-      angry: { mode: 'file', file: `${strawberryFolder}/expressions/\u9ed1\u8138.exp3.json` },
-      shy: { mode: 'file', file: `${strawberryFolder}/expressions/\u7231\u5fc3.exp3.json` },
-      suspicious: { mode: 'preset', params: suspiciousPreset },
-      surprised: {
-        mode: 'preset',
-        params: {
-          ParamMouthOpenY: 0.8,
-          ParamEyeLOpen: 1.2,
-          ParamEyeROpen: 1.2,
-        },
-      },
-      embarrassed: { mode: 'file', file: `${strawberryFolder}/expressions/\u7ea2\u8138.exp3.json` },
-      playful: { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
-    },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+      expression(
+        'starry_eyes',
+        'Starry Eyes',
+        'bright delighted star eyes',
+        { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
+        ['happy', 'excited', 'starry', 'delighted', '\u5f00\u5fc3', '\u6fc0\u52a8'],
+      ),
+      expression(
+        'heart_eyes',
+        'Heart Eyes',
+        'heart-shaped loving eyes',
+        { mode: 'file', file: `${strawberryFolder}/expressions/\u7231\u5fc3.exp3.json` },
+        ['love', 'heart', 'adoring', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
+      ),
+      expression(
+        'blush',
+        'Blush',
+        'soft blushing embarrassed face',
+        { mode: 'file', file: `${strawberryFolder}/expressions/\u7ea2\u8138.exp3.json` },
+        ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
+      ),
+      expression(
+        'dark_face',
+        'Dark Face',
+        'dark-faced angry or upset mood',
+        { mode: 'file', file: `${strawberryFolder}/expressions/\u9ed1\u8138.exp3.json` },
+        ['angry', 'mad', 'dark', 'annoyed', '\u751f\u6c14', '\u9ed1\u8138'],
+      ),
+    ],
     motions: {
       idle: { file: `${strawberryFolder}/motion/Scene1.motion3.json` },
     },
@@ -266,22 +318,69 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0.02,
     },
-    expressions: {
-      neutral: { mode: 'preset', params: { ParamCheek: 0, ParamMouthForm: 0, ParamMouthX: 0 } },
-      happy: { mode: 'file', file: `${rabbitMotion}/\u7b11.exp3.json` },
-      sad: { mode: 'file', file: `${rabbitMotion}/\u6d41\u6c57.exp3.json` },
-      angry: { mode: 'file', file: `${rabbitMotion}/\u5acc\u5f03.exp3.json` },
-      shy: { mode: 'file', file: `${rabbitMotion}/wink.exp3.json` },
-      suspicious: { mode: 'preset', params: rabbitSuspiciousPreset },
-      surprised: { mode: 'file', file: `${rabbitMotion}/\u6655\u6655.exp3.json` },
-      embarrassed: { mode: 'file', file: `${rabbitMotion}/\u6d41\u6c57.exp3.json` },
-      playful: { mode: 'file', file: `${rabbitMotion}/\u574f\u7b11.exp3.json` },
-    },
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face without added expression files',
+        { mode: 'preset', params: { ParamCheek: 0, ParamMouthForm: 0, ParamMouthX: 0 } },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+      expression(
+        'smile',
+        'Smile',
+        'clear smiling expression',
+        { mode: 'file', file: `${rabbitMotion}/\u7b11.exp3.json` },
+        ['happy', 'smile', 'cheerful', '\u5f00\u5fc3', '\u7b11'],
+      ),
+      expression(
+        'sweat',
+        'Sweat',
+        'sweaty anxious or awkward face',
+        { mode: 'file', file: `${rabbitMotion}/\u6d41\u6c57.exp3.json` },
+        ['awkward', 'nervous', 'sweat', 'anxious', '\u7d27\u5f20', '\u6d41\u6c57'],
+      ),
+      expression(
+        'disgust',
+        'Disgust',
+        'disdainful or annoyed expression',
+        { mode: 'file', file: `${rabbitMotion}/\u5acc\u5f03.exp3.json` },
+        ['angry', 'disgust', 'disdain', 'annoyed', '\u5acc\u5f03', '\u538c\u70e6'],
+      ),
+      expression(
+        'wink',
+        'Wink',
+        'playful wink',
+        { mode: 'file', file: `${rabbitMotion}/wink.exp3.json` },
+        ['wink', 'playful', 'teasing', '\u7728\u773c', '\u8c03\u76ae'],
+      ),
+      expression(
+        'dizzy',
+        'Dizzy',
+        'dizzy or overwhelmed expression',
+        { mode: 'file', file: `${rabbitMotion}/\u6655\u6655.exp3.json` },
+        ['dizzy', 'dazed', 'overwhelmed', 'surprised', '\u6655', '\u61f5'],
+      ),
+      expression(
+        'smirk',
+        'Smirk',
+        'mischievous smug grin',
+        { mode: 'file', file: `${rabbitMotion}/\u574f\u7b11.exp3.json` },
+        ['smug', 'smirk', 'mischievous', 'playful', '\u574f\u7b11', '\u5f97\u610f'],
+      ),
+      expression(
+        'tongue_cry',
+        'Tongue Cry',
+        'crying face with tongue out',
+        { mode: 'file', file: `${rabbitMotion}/\u5410\u820c\u54ed\u54ed.exp3.json` },
+        ['cry', 'sad', 'tongue', 'messy', '\u54ed', '\u5410\u820c'],
+      ),
+    ],
   },
   fuxuan: {
     id: 'fuxuan',
     name: 'Fu Xuan',
-    summary: 'No built-in exp files. This model validates the parameter-preset branch of the manifest.',
+    summary: 'This model currently has no curated exp3 expression set, so only the neutral state is exposed.',
     modelJson: `${fuxuanFolder}/\u7b26\u7384.model3.json`,
     scaleMultiplier: 0.28,
     verticalOffset: 0.07,
@@ -290,93 +389,34 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0,
     },
-    expressions: {
-      neutral: { mode: 'preset', params: fuxuanNeutral },
-      happy: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          ParamMouthForm: 0.35,
-          ParamEyeLSmile: 0.55,
-          ParamEyeRSmile: 0.55,
-          ParamBrowLY: 0.25,
-          ParamBrowRY: 0.25,
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face only',
+        {
+          mode: 'preset',
+          params: {
+            Param101: 0,
+            Param104: 0,
+            Param109: 0,
+            Param130: 0,
+            ParamEyeLSmile: 0,
+            ParamEyeRSmile: 0,
+            ParamMouthForm: 0,
+            ParamMouthOpenY: 0,
+            ParamBrowLForm: 0,
+            ParamBrowRForm: 0,
+          },
         },
-      },
-      sad: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          Param130: 1,
-          ParamMouthForm: -0.6,
-          ParamBrowLForm: -0.35,
-          ParamBrowRForm: -0.35,
-        },
-      },
-      angry: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          Param104: 1,
-          ParamMouthForm: -0.35,
-          ParamBrowLAngle: -0.5,
-          ParamBrowRAngle: 0.5,
-        },
-      },
-      shy: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          Param109: 1,
-          ParamMouthForm: 0.2,
-          ParamEyeLSmile: 0.45,
-          ParamEyeRSmile: 0.45,
-        },
-      },
-      suspicious: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          ParamMouthForm: -0.2,
-          ParamBrowLForm: -0.5,
-          ParamBrowRForm: -0.5,
-          ParamEyeBallX: 0.3,
-        },
-      },
-      surprised: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          ParamMouthOpenY: 0.8,
-          ParamEyeLOpen: 1.2,
-          ParamEyeROpen: 1.2,
-        },
-      },
-      embarrassed: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          Param101: 1,
-          ParamMouthForm: -0.1,
-          ParamEyeLSmile: 0.2,
-          ParamEyeRSmile: 0.2,
-        },
-      },
-      playful: {
-        mode: 'preset',
-        params: {
-          ...fuxuanNeutral,
-          ParamMouthForm: 0.45,
-          ParamCheek: 0.25,
-          ParamEyeBallX: -0.25,
-        },
-      },
-    },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+    ],
   },
   huohuo: {
     id: 'huohuo',
     name: 'Huo Huo',
-    summary: 'Mixed exp and motion assets. Good for validating the next step toward motion orchestration.',
+    summary: 'Mixed exp and motion assets. Only explicit, curated expression files are exposed here.',
     modelJson: `${huohuoFolder}/\u85ff\u85ff.model3.json`,
     scaleMultiplier: 0.22,
     verticalOffset: 0.06,
@@ -385,32 +425,50 @@ export const avatars: Record<string, AvatarManifest> = {
       offsetX: 0,
       offsetY: 0,
     },
-    expressions: {
-      neutral: { mode: 'preset', params: { Param107: 0, Param108: 0, ParamCheek: 0 } },
-      happy: { mode: 'preset', params: genericCutePreset },
-      sad: { mode: 'file', file: `${huohuoFolder}/\u773c\u6cea.exp3.json` },
-      angry: { mode: 'file', file: `${huohuoFolder}/\u9ed1\u8138.exp3.json` },
-      shy: {
-        mode: 'preset',
-        params: {
-          ...genericCutePreset,
-          ParamCheek: 0.5,
-          ParamEyeBallX: -0.15,
-          ParamEyeBallY: 0.15,
-        },
-      },
-      suspicious: { mode: 'preset', params: suspiciousPreset },
-      surprised: { mode: 'file', file: `${huohuoFolder}/\u767d\u773c.exp3.json` },
-      embarrassed: {
-        mode: 'preset',
-        params: {
-          Param107: 0.7,
-          ParamCheek: 0.4,
-          ParamMouthForm: -0.05,
-        },
-      },
-      playful: { mode: 'file', file: `${huohuoFolder}/\u62ff\u65d7\u5b50.exp3.json` },
-    },
+    expressions: [
+      expression(
+        'neutral',
+        'Neutral',
+        'default calm face with no explicit exp3 overlays',
+        { mode: 'preset', params: { Param107: 0, Param108: 0, ParamCheek: 0 } },
+        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+      ),
+      expression(
+        'tears',
+        'Tears',
+        'sad crying expression with visible tears',
+        { mode: 'file', file: `${huohuoFolder}/\u773c\u6cea.exp3.json` },
+        ['sad', 'cry', 'tears', 'upset', '\u54ed', '\u773c\u6cea'],
+      ),
+      expression(
+        'dark_face',
+        'Dark Face',
+        'dark-faced angry mood',
+        { mode: 'file', file: `${huohuoFolder}/\u9ed1\u8138.exp3.json` },
+        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
+      ),
+      expression(
+        'white_eyes',
+        'White Eyes',
+        'rolled or whitened eyes for shock or exasperation',
+        { mode: 'file', file: `${huohuoFolder}/\u767d\u773c.exp3.json` },
+        ['surprised', 'shocked', 'speechless', 'white eyes', '\u767d\u773c', '\u65e0\u8bed'],
+      ),
+      expression(
+        'flag',
+        'Flag',
+        'playful pose with a flag accessory',
+        { mode: 'file', file: `${huohuoFolder}/\u62ff\u65d7\u5b50.exp3.json` },
+        ['playful', 'flag', 'cheer', 'cute', '\u8c03\u76ae', '\u62ff\u65d7\u5b50'],
+      ),
+      expression(
+        'pillow',
+        'Pillow',
+        'soft cozy pose holding a pillow',
+        { mode: 'file', file: `${huohuoFolder}/\u62b1\u6795.exp3.json` },
+        ['sleepy', 'cozy', 'soft', 'pillow', '\u56f0', '\u62b1\u6795'],
+      ),
+    ],
     motions: {
       lively: { file: `${huohuoFolder}/haoqi.motion3.json` },
       sleepy: { file: `${huohuoFolder}/keshui.motion3.json` },
@@ -419,3 +477,25 @@ export const avatars: Record<string, AvatarManifest> = {
 };
 
 export const avatarList = Object.values(avatars);
+
+export function getAvatarExpression(avatar: AvatarManifest, expressionId: ExpressionId) {
+  return avatar.expressions.find((expressionItem) => expressionItem.id === expressionId);
+}
+
+export function getAvatarExpressionIds(avatar: AvatarManifest) {
+  return avatar.expressions.map((expressionItem) => expressionItem.id);
+}
+
+export function getAvatarExpressionLabel(avatar: AvatarManifest, expressionId: ExpressionId) {
+  return getAvatarExpression(avatar, expressionId)?.label ?? expressionId;
+}
+
+export function getAvatarNeutralExpressionId(avatar: AvatarManifest) {
+  return avatar.expressions.find((expressionItem) => expressionItem.id === 'neutral')?.id
+    ?? avatar.expressions[0]?.id
+    ?? 'neutral';
+}
+
+export function hasAvatarExpression(avatar: AvatarManifest, expressionId: ExpressionId) {
+  return avatar.expressions.some((expressionItem) => expressionItem.id === expressionId);
+}
