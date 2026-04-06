@@ -142,7 +142,6 @@ export default function App() {
     try {
       const response = await createAssistantResponse({
         avatar: selectedAvatar,
-        userInput: trimmed,
         history: nextMessages,
         systemPrompt: createSystemPrompt(selectedAvatar),
       });

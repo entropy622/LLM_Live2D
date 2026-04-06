@@ -17,9 +17,12 @@ type ExpressionPresetBinding = {
 
 export type ExpressionBinding = ExpressionFileBinding | ExpressionPresetBinding;
 
+export type ExpressionKind = 'emotion' | 'pose' | 'prop' | 'effect';
+
 export type AvatarExpression = {
   id: ExpressionId;
   label: string;
+  kind: ExpressionKind;
   prompt: string;
   binding: ExpressionBinding;
   aliases?: string[];
@@ -77,10 +80,12 @@ function expression(
   prompt: string,
   binding: ExpressionBinding,
   aliases: string[] = [],
+  kind: ExpressionKind = 'emotion',
 ): AvatarExpression {
   return {
     id,
     label,
+    kind,
     prompt,
     binding,
     aliases,
@@ -185,6 +190,7 @@ function createStrawberryBunnyManifest(
         'cute pose making a finger heart',
         { mode: 'file', file: `${folder}/expressions/\u6bd4\u5fc3.exp3.json` },
         ['love', 'heart', 'finger heart', 'cute', '\u6bd4\u5fc3', '\u793a\u7231'],
+        'pose',
       ),
       expression(
         'tongue_out',
@@ -241,6 +247,7 @@ function createStrawberryBunnyManifest(
         'romantic flowers effect around the face',
         { mode: 'file', file: `${folder}/expressions/\u82b1\u82b1.exp3.json` },
         ['flowers', 'romantic', 'dreamy', '\u82b1\u82b1', '\u6d6a\u6f2b'],
+        'effect',
       ),
       expression(
         'gaming',
@@ -248,6 +255,7 @@ function createStrawberryBunnyManifest(
         'gaming prop expression with a controller setup',
         { mode: 'file', file: `${folder}/expressions/\u6253\u6e38\u620f.exp3.json` },
         ['gaming', 'gamepad', 'controller', '\u6253\u6e38\u620f', '\u73a9\u6e38\u620f'],
+        'prop',
       ),
       expression(
         'microphone',
@@ -255,6 +263,7 @@ function createStrawberryBunnyManifest(
         'performance pose with a microphone',
         { mode: 'file', file: `${folder}/expressions/\u8bdd\u7b52.exp3.json` },
         ['microphone', 'singing', 'performance', '\u8bdd\u7b52', '\u5531\u6b4c'],
+        'prop',
       ),
     );
   }
@@ -440,6 +449,7 @@ export const avatars: Record<string, AvatarManifest> = {
         'shy pose with clear affectionate restraint',
         { mode: 'file', file: `${ellenFolder}/shou.exp3.json` },
         ['shy', 'bashful', 'timid', '\u5bb3\u7f9e', '\u7f9e\u601d'],
+        'pose',
       ),
       expression(
         'shock',
@@ -623,6 +633,7 @@ export const avatars: Record<string, AvatarManifest> = {
         'playful pose with a flag accessory',
         { mode: 'file', file: `${huohuoFolder}/\u62ff\u65d7\u5b50.exp3.json` },
         ['playful', 'flag', 'cheer', 'cute', '\u8c03\u76ae', '\u62ff\u65d7\u5b50'],
+        'prop',
       ),
       expression(
         'pillow',
@@ -630,6 +641,7 @@ export const avatars: Record<string, AvatarManifest> = {
         'soft cozy pose holding a pillow',
         { mode: 'file', file: `${huohuoFolder}/\u62b1\u6795.exp3.json` },
         ['sleepy', 'cozy', 'soft', 'pillow', '\u56f0', '\u62b1\u6795'],
+        'prop',
       ),
     ],
     motions: {

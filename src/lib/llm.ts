@@ -4,6 +4,7 @@ import type {
   ExpressionLayer,
 } from '../features/live2d/avatarManifest.ts';
 import {
+  getAvatarExpression,
   getAvatarNeutralExpressionId,
   hasAvatarExpression,
 } from '../features/live2d/avatarManifest.ts';
@@ -28,7 +29,6 @@ export type AssistantResponse = {
 
 type CreateAssistantResponseArgs = {
   avatar: AvatarManifest;
-  userInput: string;
   history: ChatMessage[];
   systemPrompt: string;
 };
@@ -85,6 +85,28 @@ function stripMarkdownFence(raw: string) {
 
 function sortExpressionMix(layers: ExpressionLayer[]) {
   return [...layers].sort((left, right) => right.weight - left.weight);
+}
+
+function formatHistoryState(avatar: AvatarManifest, expressionMix: ExpressionLayer[] | undefined) {
+  if (!expressionMix?.length) {
+    return '';
+  }
+
+  return expressionMix
+    .map((layer) => {
+      const expressionItem = getAvatarExpression(avatar, layer.key);
+      const kind = expressionItem?.kind ?? 'emotion';
+      return `${layer.key}:${kind}:${layer.weight.toFixed(2)}`;
+    })
+    .join(', ');
+}
+
+function serializeHistoryMessage(avatar: AvatarManifest, message: ChatMessage) {
+  if (message.role !== 'assistant' || !message.expressionMix?.length) {
+    return message.content;
+  }
+
+  return `${message.content}\n[avatar_state ${formatHistoryState(avatar, message.expressionMix)}]`;
 }
 
 export function normalizeExpressionMix(
@@ -192,7 +214,6 @@ export function hasUsableLlmSettings(settings: LlmSettings) {
 
 async function requestRemoteAssistant({
   avatar,
-  userInput,
   history,
   systemPrompt,
 }: CreateAssistantResponseArgs): Promise<AssistantResponse> {
@@ -220,9 +241,8 @@ async function requestRemoteAssistant({
         { role: 'system', content: systemPrompt },
         ...history.map((message) => ({
           role: message.role,
-          content: message.content,
+          content: serializeHistoryMessage(avatar, message),
         })),
-        { role: 'user', content: userInput },
       ],
     }),
   });
@@ -263,7 +283,7 @@ export function createSystemPrompt(avatar: AvatarManifest) {
   const available = avatar.expressions
     .map(
       (expressionItem) =>
-        `- id: "${expressionItem.id}", label: "${expressionItem.label}", meaning: "${expressionItem.prompt}"`,
+        `- id: "${expressionItem.id}", kind: "${expressionItem.kind}", label: "${expressionItem.label}", meaning: "${expressionItem.prompt}"`,
     )
     .join('\n');
 
@@ -271,7 +291,11 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     `You are controlling the Live2D avatar ${avatar.name}.`,
     'Only use expressions from this exact catalog:',
     available,
-    'Choose one to three expressions and blend them only when the tone is mixed.',
+    'Treat kind="emotion" as mood layers.',
+    'Treat kind="pose", kind="prop", and kind="effect" as scene layers rather than pure emotions.',
+    'If a recent assistant message includes [avatar_state ...], preserve relevant ongoing pose/prop/effect layers unless the new turn clearly ends or replaces that activity.',
+    'When the user adds a new emotion during an ongoing activity, keep the activity layer and blend the new emotion on top of it.',
+    'Choose one to three expressions and blend them only when the mood or scene is mixed.',
     'Do not invent unsupported emotions or ids.',
     'Return strict JSON with reply, expression, expressionMix, intensity, durationMs.',
     'expression must be one valid catalog id.',
