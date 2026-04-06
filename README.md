@@ -1,8 +1,14 @@
 # LLM Live2D
 
-一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在回复文本的同时控制角色表情，并支持多种表情混合。
+一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在回复文本的同时控制角色表情.
 
 体验地址：`https://entropy622.github.io/LLM_Live2D/`
+
+## 背景
+
+本项目受到 `Neuro Sama` 启发。
+
+社区复刻`Neuro Sama` 项目，比如`Airi`，并不支持LLM去直接控制Live2D的各种expression key。这个项目是为了补齐这一点。
 
 ## 当前能力
 
@@ -97,10 +103,6 @@ LLM 输出语义表情和回复文本，前端再通过 manifest 把语义标签
 - 水印开关
 - 初始缩放与位置
 
-### 3. 资源路径对 GitHub Pages 友好
-
-资源统一放在 `public/live2D/` 下，通过 `import.meta.env.BASE_URL` 构造路径，因此本地开发和 GitHub Pages 子路径部署可以共用同一套逻辑。
-
 ## 构建与检查
 
 构建：
@@ -120,10 +122,6 @@ pnpm lint
 ```bash
 pnpm preview
 ```
-
-## 版权与试用说明
-
-部分模型为试用版本，并带有作者提供的原始标识或水印。项目保留这些原始标识，不尝试移除或绕过。
 
 ## 模型作者
 

@@ -75,7 +75,7 @@ button {
 
 .chat-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .chat-header-actions {
@@ -384,36 +384,15 @@ button {
   color: #b9b1a4;
 }
 
-.directive-card {
-  min-width: 120px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.05);
-  text-align: right;
-}
-
-.directive-card p,
-.directive-card strong,
-.directive-box span,
-.directive-box strong,
 .message header,
 .message p,
 .message small {
   margin: 0;
 }
 
-.directive-card p,
-.directive-box span,
 .message small {
   color: #9ba2aa;
   font-size: 0.82rem;
-}
-
-.directive-grid {
-  padding: 0 24px 16px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
 }
 
 .settings-entry,
@@ -486,22 +465,13 @@ button {
   font-size: 1.5rem;
 }
 
-.directive-box {
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: grid;
-  gap: 8px;
-}
-
 .messages {
   min-height: 0;
   min-width: 0;
   overflow: auto;
   display: grid;
   gap: 12px;
-  padding: 0 24px 20px;
+  padding: 4px 24px 20px;
 }
 
 .message {
@@ -592,7 +562,6 @@ button {
 
   .panel-header,
   .panel-footer,
-  .directive-grid,
   .messages,
   .composer {
     padding-left: 16px;
@@ -609,8 +578,7 @@ button {
     align-items: flex-end;
   }
 
-  .field,
-  .directive-card {
+  .field {
     width: 100%;
   }
 
@@ -618,10 +586,6 @@ button {
     width: 100%;
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .directive-grid {
-    grid-template-columns: 1fr;
   }
 
   .transform-grid {

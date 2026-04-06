@@ -19,7 +19,6 @@ import {
   LlmResponseFormatError,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
-  type AssistantResponse,
   type ChatMessage,
   type LlmSettings,
 } from './lib/llm.ts';
@@ -68,7 +67,6 @@ export default function App() {
   const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(
     createNeutralMix(defaultAvatarId),
   );
-  const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [watermarkVisible, setWatermarkVisible] = useState(
@@ -103,7 +101,6 @@ export default function App() {
       setStageTransform(resolvedAvatar.transformDefaults);
       setWatermarkVisible(resolvedAvatar.watermark?.enabledByDefault ?? false);
       setActiveExpressionMix([{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }]);
-      setLastDirective(null);
 
       if (!hasResolvedInitialAvatar.current) {
         hasResolvedInitialAvatar.current = true;
@@ -153,7 +150,6 @@ export default function App() {
         systemPrompt: createSystemPrompt(selectedAvatar),
       });
 
-      setLastDirective(response);
       setActiveExpressionMix(response.expressionMix);
       setMessages((current) => [
         ...current,
@@ -277,7 +273,6 @@ export default function App() {
 
         <div className="panel-footer">
           <div>
-            <p className="section-label">Manifest</p>
             <p className="muted">{selectedAvatar.summary}</p>
           </div>
           <div className="transform-grid">
@@ -364,21 +359,6 @@ export default function App() {
             >
               LLM Settings
             </button>
-          </div>
-        </div>
-
-        <div className="directive-grid">
-          <div className="directive-box">
-            <span>Blend</span>
-            <strong>{formatExpressionMix(selectedAvatar, lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
-          </div>
-          <div className="directive-box">
-            <span>Intensity</span>
-            <strong>{lastDirective?.intensity ?? 0.6}</strong>
-          </div>
-          <div className="directive-box">
-            <span>Duration</span>
-            <strong>{lastDirective?.durationMs ?? 2800} ms</strong>
           </div>
         </div>
 
