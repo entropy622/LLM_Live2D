@@ -2,45 +2,16 @@
 
 一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在回复文本的同时控制角色表情，并支持多种表情混合。
 
-体验地址：
-`https://entropy622.github.io/LLM_Live2D/`
-
-## 项目灵感
-
-项目从 `Neuro Same` 中受到启发。`Neuro Same` 以及最近出的 `Airi` 中，LLM都不能生动的控制live2d模型的表情，于是有了这个实验项目。
+体验地址：`https://entropy622.github.io/LLM_Live2D/`
 
 ## 当前能力
 
 - 左侧 Live2D，右侧对话面板
 - 支持结构化 LLM 输出
 - 支持单表情和多表情混合控制
-- 支持本地 mock 回退
-- 支持网页内填写并保存 LLM 配置
+- 支持在网页中填写并保存 LLM 配置
 - 支持鼠标注视跟随
 - 支持 GitHub Pages 部署
-
-## 当前已接入模型
-
-- `Yumi`
-- `Ellen`
-- `Strawberry Bunny`
-- `Rabbit Hole`
-- `Fu Xuan`
-- `Huo Huo`
-
-## 统一语义表情层
-
-项目统一使用以下语义标签，再映射到不同模型自己的 `.exp3.json` 或参数预设：
-
-- `neutral`
-- `happy`
-- `sad`
-- `angry`
-- `shy`
-- `suspicious`
-- `surprised`
-- `embarrassed`
-- `playful`
 
 ## 技术栈
 
@@ -71,7 +42,7 @@ pnpm dev
 http://127.0.0.1:4173
 ```
 
-如果你使用 npm：
+如果你使用 `npm`：
 
 ```bash
 npm install
@@ -101,7 +72,6 @@ VITE_LLM_MODEL=deepseek-chat
 public/
   live2dcubismcore.min.js
   live2D/                  # Live2D 静态资源
-
 src/
   App.tsx
   lib/llm.ts
@@ -121,15 +91,15 @@ LLM 输出语义表情和回复文本，前端再通过 manifest 把语义标签
 
 `src/features/live2d/avatarManifest.ts` 负责：
 
-- 统一语义到不同模型的映射
-- `.exp3.json` 绑定
+- 表情目录与 `.exp3.json` 绑定
 - 参数预设
 - motion 资源
-- 初始缩放与位移
+- 水印开关
+- 初始缩放与位置
 
 ### 3. 资源路径对 GitHub Pages 友好
 
-资源统一放在 `public/live2D/` 下，路径通过 `import.meta.env.BASE_URL` 构造，因此本地开发和 GitHub Pages 子路径部署可以共用一套逻辑。
+资源统一放在 `public/live2D/` 下，通过 `import.meta.env.BASE_URL` 构造路径，因此本地开发和 GitHub Pages 子路径部署可以共用同一套逻辑。
 
 ## 构建与检查
 
@@ -153,14 +123,15 @@ pnpm preview
 
 ## 版权与试用说明
 
-部分新增模型是试用版本，并带有原作者嵌入的试用水印。该项目保留这些原始标识，不会尝试移除或绕过。
+部分模型为试用版本，并带有作者提供的原始标识或水印。项目保留这些原始标识，不尝试移除或绕过。
 
 ## 模型作者
 
 - `Yumi`：Erara_艾拉拉
-- `Ellen`：神宫良子
-- `Strawberry Bunny`：糖糖锦鲤
-- `Rabbit Hole`：北酱QwQ
+- `草莓兔兔`：糖糖锦鲤
+- `冰糖`：神宫凉子
+- `Ellen`：神宫凉子
+- `Rabbit Hole`：北酱OwQ
 - `Fu Xuan`：白泠Baily
 - `Huo Huo`：白泠Baily
 

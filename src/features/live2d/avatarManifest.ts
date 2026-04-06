@@ -35,7 +35,7 @@ export type MotionBinding = {
 
 export type WatermarkBinding = {
   enabledByDefault: boolean;
-  binding: ExpressionBinding;
+  bindings: ExpressionBinding[];
 };
 
 export type AvatarManifest = {
@@ -97,6 +97,7 @@ const rabbitModel = `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`;
 const rabbitMotion = `${rabbitFolder}/motions`;
 
 const ellenFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u827e\u83b2');
+const bingtangFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6');
 const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u51541');
 const strawberryTrialFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
 const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
@@ -270,7 +271,7 @@ function createStrawberryBunnyManifest(
 
   return {
     id: 'strawberryBunny',
-    name: 'Strawberry Bunny',
+    name: '\u8349\u8393\u5154\u5154',
     summary,
     modelJson: `${folder}/${modelJsonFile}`,
     scaleMultiplier: 0.29,
@@ -287,7 +288,7 @@ function createStrawberryBunnyManifest(
     },
     watermark: {
       enabledByDefault: false,
-      binding: { mode: 'file', file: `${folder}/expressions/\u6c34\u5370.exp3.json` },
+      bindings: [{ mode: 'file', file: `${folder}/expressions/\u6c34\u5370.exp3.json` }],
     },
   };
 }
@@ -305,6 +306,82 @@ const strawberryBunnyTrialManifest = createStrawberryBunnyManifest(
   '\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json',
   'trial',
 );
+
+const bingtangManifest: AvatarManifest = {
+  id: 'bingtang',
+  name: '\u51b0\u7cd6',
+  summary: 'High-quality model by \u795e\u5bab\u51c9\u5b50 with strong blush, laugh, dark-face, and shocked-eye cues.',
+  modelJson: `${bingtangFolder}/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6.model3.json`,
+  scaleMultiplier: 0.3,
+  verticalOffset: 0.08,
+  modelTransform: createModelTransform(1, 0, 0),
+  transformDefaults: {
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+  },
+  expressions: [
+    expression(
+      'neutral',
+      'Neutral',
+      'default calm face with no explicit expression overlay',
+      {
+        mode: 'preset',
+        params: {
+          Paramlove2: 0,
+          Paramlove3: 0,
+          Paramlove4: 0,
+          Paramexpblack: 0,
+          Paraexpchouxiang: 0,
+          Paramexpeyeout: 0,
+        },
+      },
+      ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+    ),
+    expression(
+      'laugh',
+      'Laugh',
+      'bright happy laughing expression',
+      { mode: 'file', file: `${bingtangFolder}/hah.exp3.json` },
+      ['happy', 'laugh', 'smile', 'cheerful', '\u5f00\u5fc3', '\u7b11'],
+    ),
+    expression(
+      'blush',
+      'Blush',
+      'embarrassed blushing face',
+      { mode: 'file', file: `${bingtangFolder}/red.exp3.json` },
+      ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5bb3\u7f9e'],
+    ),
+    expression(
+      'angry',
+      'Angry',
+      'clearly angry expression',
+      { mode: 'file', file: `${bingtangFolder}/angery.exp3.json` },
+      ['angry', 'mad', 'annoyed', '\u751f\u6c14', '\u6124\u6012'],
+    ),
+    expression(
+      'dark_face',
+      'Dark Face',
+      'dark-faced upset or angry mood',
+      { mode: 'file', file: `${bingtangFolder}/black.exp3.json` },
+      ['dark', 'angry', 'annoyed', '\u9ed1\u8138', '\u751f\u6c14'],
+    ),
+    expression(
+      'wide_eyes',
+      'Wide Eyes',
+      'wide shocked eyes for surprise or speechlessness',
+      { mode: 'file', file: `${bingtangFolder}/O O.exp3.json` },
+      ['surprised', 'shocked', 'speechless', 'wide eyes', '\u60ca\u8bb6', '\u65e0\u8bed'],
+    ),
+  ],
+  watermark: {
+    enabledByDefault: false,
+    bindings: [
+      { mode: 'file', file: `${bingtangFolder}/shuiyin1.exp3.json` },
+      { mode: 'file', file: `${bingtangFolder}/shuiyin2.exp3.json` },
+    ],
+  },
+};
 
 avatarResolvers.set('strawberryBunny', async () => (
   (await assetExists(strawberryBunnyFullManifest.modelJson))
@@ -472,9 +549,10 @@ export const avatars: Record<string, AvatarManifest> = {
     },
     watermark: {
       enabledByDefault: false,
-      binding: { mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` },
+      bindings: [{ mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` }],
     },
   },
+  bingtang: bingtangManifest,
   strawberryBunny: strawberryBunnyFullManifest,
   rabbitHole: {
     id: 'rabbitHole',
@@ -651,7 +729,11 @@ export const avatars: Record<string, AvatarManifest> = {
   },
 };
 
-export const avatarList = Object.values(avatars);
+export const featuredAvatarIds = ['yumi', 'strawberryBunny', 'bingtang', 'ellen'] as const;
+export const avatarList = [
+  ...featuredAvatarIds.map((avatarId) => avatars[avatarId]),
+  ...Object.values(avatars).filter((avatar) => !featuredAvatarIds.includes(avatar.id as never)),
+];
 
 export function getAvatarById(avatarId: string) {
   return avatars[avatarId];

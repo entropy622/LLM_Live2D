@@ -249,7 +249,9 @@ async function buildMixedParameters(
   }
 
   if (watermarkVisible && avatar.watermark) {
-    await mergeBindingIntoParameters(runtime, nextParams, avatar.watermark.binding, 1);
+    for (const binding of avatar.watermark.bindings) {
+      await mergeBindingIntoParameters(runtime, nextParams, binding, 1);
+    }
   }
 
   return nextParams;

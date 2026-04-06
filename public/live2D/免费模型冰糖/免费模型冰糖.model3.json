@@ -1,0 +1,109 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "免费模型冰糖.moc3",
+    "Textures": [
+      "免费模型冰糖.4096/texture_00.webp",
+      "免费模型冰糖.4096/texture_01.webp",
+      "免费模型冰糖.4096/texture_02.webp",
+      "免费模型冰糖.4096/texture_03.webp"
+    ],
+    "Physics": "免费模型冰糖.physics3.json",
+    "DisplayInfo": "免费模型冰糖.cdi3.json",
+    "Expressions": [
+      {
+        "Name": "HAIR11",
+        "File": "HAIR11.exp3.json"
+      },
+      {
+        "Name": "HAIR2",
+        "File": "HAIR2.exp3.json"
+      },
+      {
+        "Name": "HAIR22",
+        "File": "HAIR22.exp3.json"
+      },
+      {
+        "Name": "HAIR3",
+        "File": "HAIR3.exp3.json"
+      },
+      {
+        "Name": "HAIR33",
+        "File": "HAIR33.exp3.json"
+      },
+      {
+        "Name": "O O",
+        "File": "O O.exp3.json"
+      },
+      {
+        "Name": "Rhair",
+        "File": "Rhair.exp3.json"
+      },
+      {
+        "Name": "angery",
+        "File": "angery.exp3.json"
+      },
+      {
+        "Name": "black",
+        "File": "black.exp3.json"
+      },
+      {
+        "Name": "danhair",
+        "File": "danhair.exp3.json"
+      },
+      {
+        "Name": "danhairL",
+        "File": "danhairL.exp3.json"
+      },
+      {
+        "Name": "hah",
+        "File": "hah.exp3.json"
+      },
+      {
+        "Name": "hairR1",
+        "File": "hairR1.exp3.json"
+      },
+      {
+        "Name": "meimao1",
+        "File": "meimao1.exp3.json"
+      },
+      {
+        "Name": "meimao2",
+        "File": "meimao2.exp3.json"
+      },
+      {
+        "Name": "red",
+        "File": "red.exp3.json"
+      },
+      {
+        "Name": "expression1",
+        "File": "shuiyin1.exp3.json"
+      },
+      {
+        "Name": "expression2",
+        "File": "shuiyin2.exp3.json"
+      }
+    ]
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeLSmile",
+        "ParamEyeROpen",
+        "ParamEyeRSmile"
+      ]
+    },
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthForm",
+        "ParamMouthOpenY"
+      ]
+    }
+  ],
+  "HitAreas": []
+}
