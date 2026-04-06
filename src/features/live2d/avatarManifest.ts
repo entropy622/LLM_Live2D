@@ -42,6 +42,11 @@ export type AvatarManifest = {
   modelJson: string;
   scaleMultiplier: number;
   verticalOffset: number;
+  modelTransform: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  };
   transformDefaults: {
     scale: number;
     offsetX: number;
@@ -54,6 +59,14 @@ export type AvatarManifest = {
 
 function publicAsset(assetPath: string) {
   return `${import.meta.env.BASE_URL}${assetPath.replace(/^\/+/, '')}`;
+}
+
+function createModelTransform(scale = 1, offsetX = 0, offsetY = 0) {
+  return {
+    scale: scale * 8,
+    offsetX,
+    offsetY: offsetY + 1.3,
+  };
 }
 
 function expression(
@@ -89,6 +102,7 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: publicAsset('live2D/yumi/yumi.model3.json'),
     scaleMultiplier: 0.27,
     verticalOffset: 0.08,
+    modelTransform: createModelTransform(1, 0, 0),
     transformDefaults: {
       scale: 1,
       offsetX: 0,
@@ -174,8 +188,9 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${ellenFolder}/\u514d\u8d39\u6a21\u578b\u827e\u83b2.model3.json`,
     scaleMultiplier: 0.31,
     verticalOffset: 0.08,
+    modelTransform: createModelTransform(1.06, 0, 0),
     transformDefaults: {
-      scale: 1.06,
+      scale: 1,
       offsetX: 0,
       offsetY: 0,
     },
@@ -248,10 +263,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${strawberryFolder}/\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json`,
     scaleMultiplier: 0.29,
     verticalOffset: 0.08,
+    modelTransform: createModelTransform(0.98, 0, 0.01),
     transformDefaults: {
-      scale: 0.98,
+      scale: 1,
       offsetX: 0,
-      offsetY: 0.01,
+      offsetY: 0,
     },
     expressions: [
       expression(
@@ -313,10 +329,11 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: rabbitModel,
     scaleMultiplier: 0.54,
     verticalOffset: 0.12,
+    modelTransform: createModelTransform(0.9, 0, 0.02),
     transformDefaults: {
-      scale: 0.9,
+      scale: 1,
       offsetX: 0,
-      offsetY: 0.02,
+      offsetY: 0,
     },
     expressions: [
       expression(
@@ -384,6 +401,7 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${fuxuanFolder}/\u7b26\u7384.model3.json`,
     scaleMultiplier: 0.28,
     verticalOffset: 0.07,
+    modelTransform: createModelTransform(1, 0, 0),
     transformDefaults: {
       scale: 1,
       offsetX: 0,
@@ -420,8 +438,9 @@ export const avatars: Record<string, AvatarManifest> = {
     modelJson: `${huohuoFolder}/\u85ff\u85ff.model3.json`,
     scaleMultiplier: 0.22,
     verticalOffset: 0.06,
+    modelTransform: createModelTransform(1.05, 0, 0),
     transformDefaults: {
-      scale: 1.05,
+      scale: 1,
       offsetX: 0,
       offsetY: 0,
     },

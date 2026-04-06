@@ -11,7 +11,6 @@ import {
   createAssistantResponse,
   createSystemPrompt,
   getDefaultLlmSettings,
-  getPrimaryExpression,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
   type AssistantResponse,
@@ -64,7 +63,6 @@ export default function App() {
   const [watermarkVisible, setWatermarkVisible] = useState(
     selectedAvatar.watermark?.enabledByDefault ?? false,
   );
-  const activeExpression = getPrimaryExpression(selectedAvatar, activeExpressionMix);
   const activeExpressionKeys = useMemo(
     () => new Set(activeExpressionMix.map((layer) => layer.key)),
     [activeExpressionMix],

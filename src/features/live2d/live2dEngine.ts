@@ -264,12 +264,14 @@ function fitModel(runtime: RuntimeState, container: HTMLElement, transform?: Sta
   app.renderer.resize(width, height);
 
   const baseScale = Math.min(width / runtime.modelBaseWidth, height / runtime.modelBaseHeight);
-  const scale = baseScale * avatar.scaleMultiplier * nextTransform.scale;
+  const scale =
+    baseScale * avatar.scaleMultiplier * avatar.modelTransform.scale * nextTransform.scale;
 
   model.scale.set(scale);
   model.anchor.set(0.5, 1);
-  model.x = width * (0.5 + nextTransform.offsetX);
-  model.y = height * (1 - avatar.verticalOffset + nextTransform.offsetY);
+  model.x = width * (0.5 + avatar.modelTransform.offsetX + nextTransform.offsetX);
+  model.y =
+    height * (1 - avatar.verticalOffset + avatar.modelTransform.offsetY + nextTransform.offsetY);
   runtime.currentTransform = nextTransform;
 }
 
