@@ -61,6 +61,10 @@ export class LlmConnectionError extends Error {
   }
 }
 
+export class LlmResponseFormatError extends Error {
+  code = 'llm_response_invalid_format' as const;
+}
+
 function clampWeight(value: number) {
   return Math.min(Math.max(value, 0), 1);
 }
@@ -83,6 +87,10 @@ function stripMarkdownFence(raw: string) {
   return raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 }
 
+function stripAvatarStateMarkers(raw: string) {
+  return raw.replace(/\s*\[avatar_state[^\]]*\]/gi, '').trim();
+}
+
 function sortExpressionMix(layers: ExpressionLayer[]) {
   return [...layers].sort((left, right) => right.weight - left.weight);
 }
@@ -101,12 +109,32 @@ function formatHistoryState(avatar: AvatarManifest, expressionMix: ExpressionLay
     .join(', ');
 }
 
-function serializeHistoryMessage(avatar: AvatarManifest, message: ChatMessage) {
-  if (message.role !== 'assistant' || !message.expressionMix?.length) {
-    return message.content;
+function extractJsonObject(raw: string) {
+  const trimmed = stripAvatarStateMarkers(stripMarkdownFence(raw));
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
   }
 
-  return `${message.content}\n[avatar_state ${formatHistoryState(avatar, message.expressionMix)}]`;
+  return trimmed.slice(firstBrace, lastBrace + 1);
+}
+
+function parseAssistantPayload(raw: string) {
+  const jsonCandidate = extractJsonObject(raw);
+
+  if (!jsonCandidate) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(jsonCandidate) as Partial<AssistantResponse> & {
+      expressionMix?: RawExpressionLayer[];
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeExpressionMix(
@@ -212,6 +240,14 @@ export function hasUsableLlmSettings(settings: LlmSettings) {
   return Boolean(settings.apiUrl && settings.apiKey && settings.model);
 }
 
+function getOngoingAvatarState(avatar: AvatarManifest, history: ChatMessage[]) {
+  const latestAssistantMessage = [...history].reverse().find(
+    (message) => message.role === 'assistant' && message.expressionMix?.length,
+  );
+
+  return formatHistoryState(avatar, latestAssistantMessage?.expressionMix);
+}
+
 async function requestRemoteAssistant({
   avatar,
   history,
@@ -221,6 +257,7 @@ async function requestRemoteAssistant({
   const apiUrl = settings.apiUrl;
   const apiKey = settings.apiKey;
   const model = settings.model;
+  const ongoingAvatarState = getOngoingAvatarState(avatar, history);
 
   if (!hasUsableLlmSettings(settings)) {
     throw new LlmConfigurationError(
@@ -237,11 +274,21 @@ async function requestRemoteAssistant({
     body: JSON.stringify({
       model,
       temperature: 0.8,
+      max_tokens: 400,
+      response_format: {
+        type: 'json_object',
+      },
       messages: [
         { role: 'system', content: systemPrompt },
+        ...(ongoingAvatarState
+          ? [{
+              role: 'system' as const,
+              content: `Ongoing avatar control state before the next reply: [avatar_state ${ongoingAvatarState}]`,
+            }]
+          : []),
         ...history.map((message) => ({
           role: message.role,
-          content: serializeHistoryMessage(avatar, message),
+          content: message.content,
         })),
       ],
     }),
@@ -260,9 +307,14 @@ async function requestRemoteAssistant({
     throw new LlmConnectionError('Remote LLM returned an empty response.');
   }
 
-  const parsed = JSON.parse(stripMarkdownFence(content)) as Partial<AssistantResponse> & {
-    expressionMix?: RawExpressionLayer[];
-  };
+  const parsed = parseAssistantPayload(content);
+
+  if (!parsed) {
+    throw new LlmResponseFormatError(
+      'Remote LLM returned content, but it was not valid JSON in the required schema.',
+    );
+  }
+
   const expressionMix = normalizeExpressionMix(
     avatar,
     parsed.expressionMix,
@@ -270,7 +322,7 @@ async function requestRemoteAssistant({
   );
 
   return {
-    reply: parsed.reply ?? '...',
+    reply: stripAvatarStateMarkers(parsed.reply ?? '...'),
     expression: getPrimaryExpression(avatar, expressionMix),
     expressionMix,
     intensity: parsed.intensity ?? 0.65,
@@ -293,17 +345,23 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     available,
     'Treat kind="emotion" as mood layers.',
     'Treat kind="pose", kind="prop", and kind="effect" as scene layers rather than pure emotions.',
-    'If a recent assistant message includes [avatar_state ...], preserve relevant ongoing pose/prop/effect layers unless the new turn clearly ends or replaces that activity.',
+    'If the system provides an [avatar_state ...] control marker, preserve relevant ongoing pose/prop/effect layers unless the new turn clearly ends or replaces that activity.',
     'When the user adds a new emotion during an ongoing activity, keep the activity layer and blend the new emotion on top of it.',
+    'The [avatar_state ...] marker is hidden control metadata. Never quote it, paraphrase it, or include it in reply text.',
     'Choose one to three expressions and blend them only when the mood or scene is mixed.',
     'Do not invent unsupported emotions or ids.',
-    'Return strict JSON with reply, expression, expressionMix, intensity, durationMs.',
+    'Return strict JSON only. Do not return plain text. Do not return markdown.',
+    'The response must be a single JSON object with exactly these top-level keys: reply, expression, expressionMix, intensity, durationMs.',
     'expression must be one valid catalog id.',
     'expressionMix must be an array of objects like {"expression":"starry_eyes","weight":0.72}.',
     'Weights must be between 0 and 1.',
     'Sort expressionMix from strongest to weakest.',
     'If one expression is clearly dominant, it may still be the only item in the array.',
-    'Do not return markdown or any extra explanation.',
+    'reply must be the user-visible natural language response string.',
+    'intensity must be a number between 0 and 1.',
+    'durationMs must be an integer number of milliseconds.',
+    'Example JSON:',
+    '{"reply":"Sounds good, let us play together.","expression":"gaming","expressionMix":[{"expression":"gaming","weight":1},{"expression":"starry_eyes","weight":0.8}],"intensity":0.9,"durationMs":3000}',
   ].join('\n');
 }
 

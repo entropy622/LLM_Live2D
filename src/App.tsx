@@ -15,6 +15,7 @@ import {
   getDefaultLlmSettings,
   LlmConfigurationError,
   LlmConnectionError,
+  LlmResponseFormatError,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
   type AssistantResponse,
@@ -173,6 +174,9 @@ export default function App() {
           error.status === 401 || error.status === 403
             ? 'LLM connection failed. Please check whether the API Key is correct.'
             : 'LLM connection failed. Please check API URL, Model, API Key, and network connectivity.';
+      } else if (error instanceof LlmResponseFormatError) {
+        content = 'LLM responded, but the returned format was invalid and could not be applied.';
+        meta = 'invalid format';
       }
 
       setMessages((current) => [
@@ -223,7 +227,7 @@ export default function App() {
         <div className="panel-header chat-header">
           <div>
             <p className="eyebrow">Live2D Lab</p>
-            <h1>LLM x Expression Control</h1>
+            <h1>LLM x Live2D</h1>
           </div>
           <div className="viewer-header-actions">
             <label className="field">
@@ -345,7 +349,6 @@ export default function App() {
         <div className="panel-header">
           <div>
             <p className="eyebrow">Dialogue</p>
-            <h2>Structured Control Loop</h2>
           </div>
           <div className="chat-header-actions">
             <button
