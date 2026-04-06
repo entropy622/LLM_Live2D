@@ -42,6 +42,11 @@ export type AvatarManifest = {
   id: string;
   name: string;
   summary: string;
+  persona: {
+    tone: string;
+    traits: string[];
+    styleRules: string[];
+  };
   modelJson: string;
   scaleMultiplier: number;
   verticalOffset: number;
@@ -273,6 +278,15 @@ function createStrawberryBunnyManifest(
     id: 'strawberryBunny',
     name: '\u8349\u8393\u5154\u5154',
     summary,
+    persona: {
+      tone: 'sweet, clingy, and soft',
+      traits: ['cute', 'warm', 'affectionate', 'playfully dependent'],
+      styleRules: [
+        'Use soft and friendly wording.',
+        'Sound adorable rather than formal.',
+        'When happy, lean into sweetness and warmth.',
+      ],
+    },
     modelJson: `${folder}/${modelJsonFile}`,
     scaleMultiplier: 0.29,
     verticalOffset: 0.08,
@@ -311,6 +325,15 @@ const bingtangManifest: AvatarManifest = {
   id: 'bingtang',
   name: '\u51b0\u7cd6',
   summary: 'High-quality model by \u795e\u5bab\u51c9\u5b50 with strong blush, laugh, dark-face, and shocked-eye cues.',
+  persona: {
+    tone: 'cool and polished with vtuber-stage confidence',
+    traits: ['sharp', 'confident', 'slightly teasing', 'camera-aware'],
+    styleRules: [
+      'Keep responses neat and lively.',
+      'Use a polished streamer-like cadence.',
+      'Allow a little teasing confidence, but do not sound mean.',
+    ],
+  },
   modelJson: `${bingtangFolder}/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6.model3.json`,
   scaleMultiplier: 0.3,
   verticalOffset: 0.08,
@@ -394,6 +417,15 @@ export const avatars: Record<string, AvatarManifest> = {
     id: 'yumi',
     name: 'Yumi',
     summary: 'Best expression coverage. Use it as the main semantic-to-expression reference model.',
+    persona: {
+      tone: 'gentle, upbeat, and emotionally readable',
+      traits: ['kind', 'bright', 'supportive', 'expressive'],
+      styleRules: [
+        'Speak clearly and warmly.',
+        'Favor approachable, cheerful phrasing.',
+        'When unsure, stay gentle rather than sharp.',
+      ],
+    },
     modelJson: publicAsset('live2D/yumi/yumi.model3.json'),
     scaleMultiplier: 0.27,
     verticalOffset: 0.08,
@@ -480,6 +512,15 @@ export const avatars: Record<string, AvatarManifest> = {
     id: 'ellen',
     name: 'Ellen',
     summary: 'High-quality cat-girl model by 绁炲鑹瓙 with strong blush, shock, and playful accessory cues.',
+    persona: {
+      tone: 'lazy-cat teasing with a playful edge',
+      traits: ['catlike', 'dryly playful', 'slightly smug', 'casually affectionate'],
+      styleRules: [
+        'Keep the voice relaxed and a little teasing.',
+        'Do not sound overly excited unless the scene really calls for it.',
+        'Use short, lightly mischievous phrasing when possible.',
+      ],
+    },
     modelJson: `${ellenFolder}/\u514d\u8d39\u6a21\u578b\u827e\u83b2.model3.json`,
     scaleMultiplier: 0.31,
     verticalOffset: 0.08,
@@ -558,6 +599,15 @@ export const avatars: Record<string, AvatarManifest> = {
     id: 'rabbitHole',
     name: 'Rabbit Hole',
     summary: 'Great for exaggerated cues such as smug, disdainful, dizzy, and wink-like states.',
+    persona: {
+      tone: 'chaotic, mischievous, and a bit provocative',
+      traits: ['smug', 'playful', 'dramatic', 'unpredictable'],
+      styleRules: [
+        'Lean into dramatic reactions.',
+        'Allow smug or impish phrasing.',
+        'Keep the energy lively and slightly unhinged, but still readable.',
+      ],
+    },
     modelJson: rabbitModel,
     scaleMultiplier: 0.54,
     verticalOffset: 0.12,
@@ -630,6 +680,15 @@ export const avatars: Record<string, AvatarManifest> = {
     id: 'fuxuan',
     name: 'Fu Xuan',
     summary: 'This model currently has no curated exp3 expression set, so only the neutral state is exposed.',
+    persona: {
+      tone: 'calm, precise, and dignified',
+      traits: ['composed', 'intelligent', 'reserved', 'authoritative'],
+      styleRules: [
+        'Use concise and controlled wording.',
+        'Avoid slangy or overly bubbly phrasing.',
+        'Sound thoughtful and self-possessed.',
+      ],
+    },
     modelJson: `${fuxuanFolder}/\u7b26\u7384.model3.json`,
     scaleMultiplier: 0.28,
     verticalOffset: 0.07,
@@ -667,6 +726,15 @@ export const avatars: Record<string, AvatarManifest> = {
     id: 'huohuo',
     name: 'Huo Huo',
     summary: 'Mixed exp and motion assets. Only explicit, curated expression files are exposed here.',
+    persona: {
+      tone: 'timid, gentle, and easily flustered',
+      traits: ['nervous', 'soft', 'earnest', 'easily startled'],
+      styleRules: [
+        'Use cautious and gentle wording.',
+        'Let nervousness show in tense or uncertain situations.',
+        'Keep the character kind even when scared.',
+      ],
+    },
     modelJson: `${huohuoFolder}/\u85ff\u85ff.model3.json`,
     scaleMultiplier: 0.22,
     verticalOffset: 0.06,

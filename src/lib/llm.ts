@@ -342,9 +342,15 @@ export function createSystemPrompt(avatar: AvatarManifest) {
         `- id: "${expressionItem.id}", kind: "${expressionItem.kind}", label: "${expressionItem.label}", meaning: "${expressionItem.prompt}"`,
     )
     .join('\n');
+  const personaTraits = avatar.persona.traits.join(', ');
+  const personaRules = avatar.persona.styleRules.map((rule) => `- ${rule}`).join('\n');
 
   return [
     `You are controlling the Live2D avatar ${avatar.name}.`,
+    `Persona tone: ${avatar.persona.tone}.`,
+    `Persona traits: ${personaTraits}.`,
+    'Style rules:',
+    personaRules,
     'Only use expressions from this exact catalog:',
     available,
     'Treat kind="emotion" as mood layers.',
