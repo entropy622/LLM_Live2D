@@ -4,9 +4,6 @@ import type {
   ExpressionLayer,
 } from '../features/live2d/avatarManifest.ts';
 import {
-  getAvatarExpression,
-  getAvatarExpressionIds,
-  getAvatarExpressionLabel,
   getAvatarNeutralExpressionId,
   hasAvatarExpression,
 } from '../features/live2d/avatarManifest.ts';
@@ -26,7 +23,7 @@ export type AssistantResponse = {
   expressionMix: ExpressionLayer[];
   intensity: number;
   durationMs: number;
-  source: 'mock' | 'remote';
+  source: 'remote';
 };
 
 type CreateAssistantResponseArgs = {
@@ -49,6 +46,20 @@ type RawExpressionLayer = {
 };
 
 const llmSettingsStorageKey = 'llm-live2d:llm-settings';
+
+export class LlmConfigurationError extends Error {
+  code = 'llm_configuration_missing' as const;
+}
+
+export class LlmConnectionError extends Error {
+  code = 'llm_connection_failed' as const;
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 function clampWeight(value: number) {
   return Math.min(Math.max(value, 0), 1);
@@ -175,19 +186,25 @@ export function clearStoredLlmSettings() {
   window.localStorage.removeItem(llmSettingsStorageKey);
 }
 
+export function hasUsableLlmSettings(settings: LlmSettings) {
+  return Boolean(settings.apiUrl && settings.apiKey && settings.model);
+}
+
 async function requestRemoteAssistant({
   avatar,
   userInput,
   history,
   systemPrompt,
-}: CreateAssistantResponseArgs): Promise<AssistantResponse | null> {
+}: CreateAssistantResponseArgs): Promise<AssistantResponse> {
   const settings = loadStoredLlmSettings();
   const apiUrl = settings.apiUrl;
   const apiKey = settings.apiKey;
   const model = settings.model;
 
-  if (!apiUrl || !apiKey || !model) {
-    return null;
+  if (!hasUsableLlmSettings(settings)) {
+    throw new LlmConfigurationError(
+      'LLM settings are incomplete. Please open LLM Settings and fill API URL, Model, and API Key.',
+    );
   }
 
   const response = await fetch(apiUrl, {
@@ -211,7 +228,7 @@ async function requestRemoteAssistant({
   });
 
   if (!response.ok) {
-    throw new Error(`Remote LLM failed with ${response.status}`);
+    throw new LlmConnectionError(`Remote LLM failed with ${response.status}`, response.status);
   }
 
   const payload = (await response.json()) as {
@@ -220,7 +237,7 @@ async function requestRemoteAssistant({
   const content = payload.choices?.[0]?.message?.content;
 
   if (!content) {
-    return null;
+    throw new LlmConnectionError('Remote LLM returned an empty response.');
   }
 
   const parsed = JSON.parse(stripMarkdownFence(content)) as Partial<AssistantResponse> & {
@@ -239,75 +256,6 @@ async function requestRemoteAssistant({
     intensity: parsed.intensity ?? 0.65,
     durationMs: parsed.durationMs ?? 2800,
     source: 'remote',
-  };
-}
-
-function includesOneOf(source: string, keywords: string[]) {
-  return keywords.some((keyword) => source.includes(keyword.toLowerCase()));
-}
-
-function pushMix(
-  layers: Array<{ key: ExpressionId; weight: number }>,
-  avatar: AvatarManifest,
-  key: ExpressionId,
-  weight: number,
-) {
-  if (!hasAvatarExpression(avatar, key)) {
-    return;
-  }
-
-  layers.push({
-    key,
-    weight,
-  });
-}
-
-function mockAssistant(userInput: string, avatar: AvatarManifest): AssistantResponse {
-  const text = userInput.toLowerCase();
-  const layers: Array<{ key: ExpressionId; weight: number }> = [];
-  let reply =
-    'Mock mode is active. This avatar now exposes only its curated expression catalog instead of a fixed global emotion set.';
-
-  const nonNeutralExpressions = avatar.expressions.filter(
-    (expressionItem) => expressionItem.id !== getAvatarNeutralExpressionId(avatar),
-  );
-
-  for (const [index, expressionItem] of nonNeutralExpressions.entries()) {
-    const aliases = [
-      expressionItem.id,
-      expressionItem.label.toLowerCase(),
-      ...(expressionItem.aliases ?? []),
-      ...expressionItem.id.split('_'),
-    ];
-
-    if (includesOneOf(text, aliases)) {
-      pushMix(layers, avatar, expressionItem.id, Math.max(0.52, 0.82 - index * 0.04));
-    }
-  }
-
-  if (layers.length === 0) {
-    pushMix(layers, avatar, getAvatarNeutralExpressionId(avatar), 1);
-  }
-
-  const expressionMix = normalizeExpressionMix(
-    avatar,
-    layers,
-    getAvatarNeutralExpressionId(avatar),
-  );
-  const expression = getPrimaryExpression(avatar, expressionMix);
-  const primaryExpression = getAvatarExpression(avatar, expression);
-
-  if (primaryExpression && primaryExpression.id !== getAvatarNeutralExpressionId(avatar)) {
-    reply = `Mock mode matched ${primaryExpression.label} from the current avatar catalog, so the controller is using that curated Live2D expression.`;
-  }
-
-  return {
-    reply,
-    expression,
-    expressionMix,
-    intensity: expression === getAvatarNeutralExpressionId(avatar) ? 0.4 : 0.75,
-    durationMs: 3200,
-    source: 'mock',
   };
 }
 
@@ -338,19 +286,5 @@ export function createSystemPrompt(avatar: AvatarManifest) {
 export async function createAssistantResponse(
   args: CreateAssistantResponseArgs,
 ): Promise<AssistantResponse> {
-  try {
-    const remote = await requestRemoteAssistant(args);
-
-    if (remote) {
-      return remote;
-    }
-  } catch (error) {
-    console.warn('Remote assistant unavailable, falling back to mock.', error);
-  }
-
-  return mockAssistant(args.userInput, args.avatar);
-}
-
-export function getAvailableExpressionLabels(avatar: AvatarManifest) {
-  return getAvatarExpressionIds(avatar).map((expressionId) => getAvatarExpressionLabel(avatar, expressionId));
+  return requestRemoteAssistant(args);
 }

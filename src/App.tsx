@@ -11,6 +11,8 @@ import {
   createAssistantResponse,
   createSystemPrompt,
   getDefaultLlmSettings,
+  LlmConfigurationError,
+  LlmConnectionError,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
   type AssistantResponse,
@@ -34,7 +36,7 @@ const starterMessages: ChatMessage[] = [
       'The lab is ready. Send a prompt to test reply generation and mixed-expression control.',
     expression: getAvatarNeutralExpressionId(avatars[defaultAvatarId]),
     expressionMix: createNeutralMix(defaultAvatarId),
-    meta: 'mock',
+    meta: 'system',
   },
 ];
 
@@ -118,6 +120,33 @@ export default function App() {
           expression: response.expression,
           expressionMix: response.expressionMix,
           meta: response.source,
+        },
+      ]);
+    } catch (error) {
+      const neutralExpression = getAvatarNeutralExpressionId(selectedAvatar);
+      let content = 'LLM connection failed. Please check the settings in LLM Settings.';
+      let meta = 'connection failed';
+
+      if (error instanceof LlmConfigurationError) {
+        content = 'LLM is not configured. Open LLM Settings and fill in API URL, Model, and API Key.';
+        meta = 'settings required';
+        setSettingsOpen(true);
+      } else if (error instanceof LlmConnectionError) {
+        content =
+          error.status === 401 || error.status === 403
+            ? 'LLM connection failed. Please check whether the API Key is correct.'
+            : 'LLM connection failed. Please check API URL, Model, API Key, and network connectivity.';
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content,
+          expression: neutralExpression,
+          expressionMix: [{ key: neutralExpression, weight: 1 }],
+          meta,
         },
       ]);
     } finally {
