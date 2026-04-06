@@ -147,9 +147,13 @@ export function normalizeExpressionMix(
       const expressionId =
         ('expression' in layer ? layer.expression : undefined) ?? layer.key ?? fallbackExpression;
       const key = clampExpression(expressionId, avatar);
+      const expressionItem = getAvatarExpression(avatar, key);
+      const normalizedWeight = clampWeight(layer.weight ?? 0);
       return {
         key,
-        weight: clampWeight(layer.weight ?? 0),
+        weight: expressionItem?.kind && expressionItem.kind !== 'emotion' && normalizedWeight > 0
+          ? 1
+          : normalizedWeight,
       };
     })
     .filter((layer) => layer.weight > 0.02);
@@ -348,6 +352,8 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     'If the system provides an [avatar_state ...] control marker, preserve relevant ongoing pose/prop/effect layers unless the new turn clearly ends or replaces that activity.',
     'When the user adds a new emotion during an ongoing activity, keep the activity layer and blend the new emotion on top of it.',
     'The [avatar_state ...] marker is hidden control metadata. Never quote it, paraphrase it, or include it in reply text.',
+    'For kind="pose", kind="prop", and kind="effect", treat them as discrete on/off layers. If you include one, set its weight to 1.',
+    'Only use percentage-like blending for kind="emotion". Do not assign fractional weights to prop, pose, or effect layers.',
     'Choose one to three expressions and blend them only when the mood or scene is mixed.',
     'Do not invent unsupported emotions or ids.',
     'Return strict JSON only. Do not return plain text. Do not return markdown.',

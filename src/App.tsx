@@ -3,6 +3,7 @@ import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
   avatarList,
   getAvatarById,
+  getAvatarExpression,
   getAvatarExpressionLabel,
   getAvatarNeutralExpressionId,
   resolveAvatarManifestById,
@@ -45,10 +46,15 @@ const starterMessages: ChatMessage[] = [
 
 function formatExpressionMix(avatar: AvatarManifest, expressionMix: ExpressionLayer[]) {
   return expressionMix
-    .map(
-      (layer) =>
-        `${getAvatarExpressionLabel(avatar, layer.key)} ${Math.round(layer.weight * 100)}%`,
-    )
+    .map((layer) => {
+      const expressionItem = getAvatarExpression(avatar, layer.key);
+      const label = getAvatarExpressionLabel(avatar, layer.key);
+      if (expressionItem?.kind && expressionItem.kind !== 'emotion') {
+        return label;
+      }
+
+      return `${label} ${Math.round(layer.weight * 100)}%`;
+    })
     .join(' + ');
 }
 
