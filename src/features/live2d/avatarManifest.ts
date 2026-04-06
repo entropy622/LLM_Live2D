@@ -57,6 +57,8 @@ export type AvatarManifest = {
   watermark?: WatermarkBinding;
 };
 
+type AvatarResolver = () => Promise<AvatarManifest>;
+
 function publicAsset(assetPath: string) {
   return `${import.meta.env.BASE_URL}${assetPath.replace(/^\/+/, '')}`;
 }
@@ -90,9 +92,216 @@ const rabbitModel = `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`;
 const rabbitMotion = `${rabbitFolder}/motions`;
 
 const ellenFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u827e\u83b2');
-const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
+const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u51541');
+const strawberryTrialFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
 const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
 const huohuoFolder = publicAsset('live2D/\u85ff\u85ff');
+
+const avatarResolvers = new Map<string, AvatarResolver>();
+const avatarResolutionCache = new Map<string, Promise<AvatarManifest>>();
+
+async function assetExists(assetPath: string) {
+  try {
+    const response = await fetch(assetPath, { method: 'HEAD' });
+    if (response.ok) {
+      return true;
+    }
+  } catch {
+    // Fall through to GET for hosts that do not support HEAD.
+  }
+
+  try {
+    const response = await fetch(assetPath, { method: 'GET' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function createStrawberryBunnyManifest(
+  folder: string,
+  summary: string,
+  modelJsonFile: string,
+  expressionSet: 'full' | 'trial',
+): AvatarManifest {
+  const expressions: AvatarExpression[] = [
+    expression(
+      'neutral',
+      'Neutral',
+      'default calm face with no extra expression overlays',
+      {
+        mode: 'preset',
+        params: {
+          Param2: 0,
+          Param3: 0,
+          Param6: 0,
+          Param7: 0,
+        },
+      },
+      ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
+    ),
+    expression(
+      'starry_eyes',
+      'Starry Eyes',
+      'bright delighted star eyes',
+      { mode: 'file', file: `${folder}/expressions/\u661f\u661f\u773c.exp3.json` },
+      ['happy', 'excited', 'starry', 'delighted', '\u5f00\u5fc3', '\u6fc0\u52a8'],
+    ),
+    expression(
+      'heart_eyes',
+      'Heart Eyes',
+      'heart-shaped loving eyes',
+      { mode: 'file', file: `${folder}/expressions/\u7231\u5fc3.exp3.json` },
+      ['love', 'heart', 'adoring', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
+    ),
+    expression(
+      'blush',
+      'Blush',
+      'soft blushing embarrassed face',
+      { mode: 'file', file: `${folder}/expressions/\u7ea2\u8138.exp3.json` },
+      ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
+    ),
+    expression(
+      'dark_face',
+      'Dark Face',
+      'dark-faced angry or upset mood',
+      { mode: 'file', file: `${folder}/expressions/\u9ed1\u8138.exp3.json` },
+      ['angry', 'mad', 'dark', 'annoyed', '\u751f\u6c14', '\u9ed1\u8138'],
+    ),
+  ];
+
+  if (expressionSet === 'full') {
+    expressions.push(
+      expression(
+        'tears',
+        'Tears',
+        'crying face with visible tears',
+        { mode: 'file', file: `${folder}/expressions/\u54ed\u54ed.exp3.json` },
+        ['sad', 'cry', 'tears', 'upset', '\u54ed', '\u96be\u8fc7'],
+      ),
+      expression(
+        'finger_heart',
+        'Finger Heart',
+        'cute pose making a finger heart',
+        { mode: 'file', file: `${folder}/expressions/\u6bd4\u5fc3.exp3.json` },
+        ['love', 'heart', 'finger heart', 'cute', '\u6bd4\u5fc3', '\u793a\u7231'],
+      ),
+      expression(
+        'tongue_out',
+        'Tongue Out',
+        'playful tongue-out face',
+        { mode: 'file', file: `${folder}/expressions/\u5410\u820c.exp3.json` },
+        ['tongue', 'playful', 'teasing', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
+      ),
+      expression(
+        'dizzy',
+        'Dizzy',
+        'dizzy or overwhelmed expression',
+        { mode: 'file', file: `${folder}/expressions/\u6655\u6655.exp3.json` },
+        ['dizzy', 'dazed', 'overwhelmed', 'surprised', '\u6655', '\u61f5'],
+      ),
+      expression(
+        'sweat',
+        'Sweat',
+        'nervous or awkward sweating face',
+        { mode: 'file', file: `${folder}/expressions/\u6d41\u6c57.exp3.json` },
+        ['sweat', 'nervous', 'awkward', 'anxious', '\u6d41\u6c57', '\u7d27\u5f20'],
+      ),
+      expression(
+        'question',
+        'Question',
+        'confused expression with a question mark cue',
+        { mode: 'file', file: `${folder}/expressions/\u95ee\u53f7.exp3.json` },
+        ['question', 'confused', 'puzzled', 'uncertain', '\u95ee\u53f7', '\u7591\u60d1'],
+      ),
+      expression(
+        'angry',
+        'Angry',
+        'clearly angry face',
+        { mode: 'file', file: `${folder}/expressions/\u751f\u6c14.exp3.json` },
+        ['angry', 'mad', 'furious', '\u751f\u6c14', '\u6124\u6012'],
+      ),
+      expression(
+        'dark_mode',
+        'Dark Mode',
+        'more dramatic blackened mood',
+        { mode: 'file', file: `${folder}/expressions/\u9ed1\u5316.exp3.json` },
+        ['dark', 'blackened', 'sinister', '\u9ed1\u5316', '\u9634\u6697'],
+      ),
+      expression(
+        'anxious',
+        'Anxious',
+        'urgent and flustered expression',
+        { mode: 'file', file: `${folder}/expressions/\u7740\u6025.exp3.json` },
+        ['anxious', 'urgent', 'flustered', 'worried', '\u7740\u6025', '\u7126\u6025'],
+      ),
+      expression(
+        'flowers',
+        'Flowers',
+        'romantic flowers effect around the face',
+        { mode: 'file', file: `${folder}/expressions/\u82b1\u82b1.exp3.json` },
+        ['flowers', 'romantic', 'dreamy', '\u82b1\u82b1', '\u6d6a\u6f2b'],
+      ),
+      expression(
+        'gaming',
+        'Gaming',
+        'gaming prop expression with a controller setup',
+        { mode: 'file', file: `${folder}/expressions/\u6253\u6e38\u620f.exp3.json` },
+        ['gaming', 'gamepad', 'controller', '\u6253\u6e38\u620f', '\u73a9\u6e38\u620f'],
+      ),
+      expression(
+        'microphone',
+        'Microphone',
+        'performance pose with a microphone',
+        { mode: 'file', file: `${folder}/expressions/\u8bdd\u7b52.exp3.json` },
+        ['microphone', 'singing', 'performance', '\u8bdd\u7b52', '\u5531\u6b4c'],
+      ),
+    );
+  }
+
+  return {
+    id: 'strawberryBunny',
+    name: 'Strawberry Bunny',
+    summary,
+    modelJson: `${folder}/${modelJsonFile}`,
+    scaleMultiplier: 0.29,
+    verticalOffset: 0.08,
+    modelTransform: createModelTransform(0.98, 0, 0.01),
+    transformDefaults: {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    },
+    expressions,
+    motions: {
+      idle: { file: `${folder}/motion/Scene1.motion3.json` },
+    },
+    watermark: {
+      enabledByDefault: false,
+      binding: { mode: 'file', file: `${folder}/expressions/\u6c34\u5370.exp3.json` },
+    },
+  };
+}
+
+const strawberryBunnyFullManifest = createStrawberryBunnyManifest(
+  strawberryFolder,
+  'Extended expression set. Uses the private full asset pack when it exists locally.',
+  '\u8349\u8393\u5154\u5154.model3.json',
+  'full',
+);
+
+const strawberryBunnyTrialManifest = createStrawberryBunnyManifest(
+  strawberryTrialFolder,
+  'Trial asset pack with the public-safe expression subset.',
+  '\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json',
+  'trial',
+);
+
+avatarResolvers.set('strawberryBunny', async () => (
+  (await assetExists(strawberryBunnyFullManifest.modelJson))
+    ? strawberryBunnyFullManifest
+    : strawberryBunnyTrialManifest
+));
 
 export const avatars: Record<string, AvatarManifest> = {
   yumi: {
@@ -256,72 +465,7 @@ export const avatars: Record<string, AvatarManifest> = {
       binding: { mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` },
     },
   },
-  strawberryBunny: {
-    id: 'strawberryBunny',
-    name: 'Strawberry Bunny',
-    summary: 'High-quality trial model by 绯栫硸閿﹂菠 with strong heart-eye, star-eye, blush, and dark-face accents.',
-    modelJson: `${strawberryFolder}/\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json`,
-    scaleMultiplier: 0.29,
-    verticalOffset: 0.08,
-    modelTransform: createModelTransform(0.98, 0, 0.01),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face with no extra trial expression overlays',
-        {
-          mode: 'preset',
-          params: {
-            Param2: 0,
-            Param3: 0,
-            Param6: 0,
-            Param7: 0,
-          },
-        },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-      expression(
-        'starry_eyes',
-        'Starry Eyes',
-        'bright delighted star eyes',
-        { mode: 'file', file: `${strawberryFolder}/expressions/\u661f\u661f\u773c.exp3.json` },
-        ['happy', 'excited', 'starry', 'delighted', '\u5f00\u5fc3', '\u6fc0\u52a8'],
-      ),
-      expression(
-        'heart_eyes',
-        'Heart Eyes',
-        'heart-shaped loving eyes',
-        { mode: 'file', file: `${strawberryFolder}/expressions/\u7231\u5fc3.exp3.json` },
-        ['love', 'heart', 'adoring', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
-      ),
-      expression(
-        'blush',
-        'Blush',
-        'soft blushing embarrassed face',
-        { mode: 'file', file: `${strawberryFolder}/expressions/\u7ea2\u8138.exp3.json` },
-        ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
-      ),
-      expression(
-        'dark_face',
-        'Dark Face',
-        'dark-faced angry or upset mood',
-        { mode: 'file', file: `${strawberryFolder}/expressions/\u9ed1\u8138.exp3.json` },
-        ['angry', 'mad', 'dark', 'annoyed', '\u751f\u6c14', '\u9ed1\u8138'],
-      ),
-    ],
-    motions: {
-      idle: { file: `${strawberryFolder}/motion/Scene1.motion3.json` },
-    },
-    watermark: {
-      enabledByDefault: false,
-      binding: { mode: 'file', file: `${strawberryFolder}/expressions/\u6c34\u5370.exp3.json` },
-    },
-  },
+  strawberryBunny: strawberryBunnyFullManifest,
   rabbitHole: {
     id: 'rabbitHole',
     name: 'Rabbit Hole',
@@ -496,6 +640,26 @@ export const avatars: Record<string, AvatarManifest> = {
 };
 
 export const avatarList = Object.values(avatars);
+
+export function getAvatarById(avatarId: string) {
+  return avatars[avatarId];
+}
+
+export async function resolveAvatarManifest(avatar: AvatarManifest) {
+  const cached = avatarResolutionCache.get(avatar.id);
+  if (cached) {
+    return cached;
+  }
+
+  const resolver = avatarResolvers.get(avatar.id);
+  const resolution = Promise.resolve(resolver ? resolver() : avatar);
+  avatarResolutionCache.set(avatar.id, resolution);
+  return resolution;
+}
+
+export function resolveAvatarManifestById(avatarId: string) {
+  return resolveAvatarManifest(getAvatarById(avatarId));
+}
 
 export function getAvatarExpression(avatar: AvatarManifest, expressionId: ExpressionId) {
   return avatar.expressions.find((expressionItem) => expressionItem.id === expressionId);

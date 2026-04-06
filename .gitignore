@@ -26,3 +26,6 @@ dist
 live2D/*
 
 .env.local
+*.zip
+
+public/live2D/草莓兔兔1/

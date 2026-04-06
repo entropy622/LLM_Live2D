@@ -1,10 +1,12 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
   avatarList,
-  avatars,
+  getAvatarById,
   getAvatarExpressionLabel,
   getAvatarNeutralExpressionId,
+  resolveAvatarManifestById,
+  type AvatarManifest,
   type ExpressionLayer,
 } from './features/live2d/avatarManifest.ts';
 import {
@@ -25,7 +27,7 @@ const repositoryUrl = 'https://github.com/entropy622/LLM_Live2D';
 const defaultAvatarId = avatarList[0].id;
 
 function createNeutralMix(avatarId: string): ExpressionLayer[] {
-  return [{ key: getAvatarNeutralExpressionId(avatars[avatarId]), weight: 1 }];
+  return [{ key: getAvatarNeutralExpressionId(getAvatarById(avatarId)), weight: 1 }];
 }
 
 const starterMessages: ChatMessage[] = [
@@ -34,23 +36,25 @@ const starterMessages: ChatMessage[] = [
     role: 'assistant',
     content:
       'The lab is ready. Send a prompt to test reply generation and mixed-expression control.',
-    expression: getAvatarNeutralExpressionId(avatars[defaultAvatarId]),
+    expression: getAvatarNeutralExpressionId(getAvatarById(defaultAvatarId)),
     expressionMix: createNeutralMix(defaultAvatarId),
     meta: 'system',
   },
 ];
 
-function formatExpressionMix(avatarId: string, expressionMix: ExpressionLayer[]) {
+function formatExpressionMix(avatar: AvatarManifest, expressionMix: ExpressionLayer[]) {
   return expressionMix
     .map(
       (layer) =>
-        `${getAvatarExpressionLabel(avatars[avatarId], layer.key)} ${Math.round(layer.weight * 100)}%`,
+        `${getAvatarExpressionLabel(avatar, layer.key)} ${Math.round(layer.weight * 100)}%`,
     )
     .join(' + ');
 }
 
 export default function App() {
+  const hasResolvedInitialAvatar = useRef(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState(defaultAvatarId);
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarManifest>(getAvatarById(defaultAvatarId));
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -60,8 +64,6 @@ export default function App() {
   const [lastDirective, setLastDirective] = useState<AssistantResponse | null>(null);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const selectedAvatar = avatars[selectedAvatarId];
   const [watermarkVisible, setWatermarkVisible] = useState(
     selectedAvatar.watermark?.enabledByDefault ?? false,
   );
@@ -81,6 +83,42 @@ export default function App() {
   useEffect(() => {
     setWatermarkVisible(selectedAvatar.watermark?.enabledByDefault ?? false);
   }, [selectedAvatar]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void resolveAvatarManifestById(selectedAvatarId).then((resolvedAvatar) => {
+      if (cancelled) {
+        return;
+      }
+
+      setSelectedAvatar(resolvedAvatar);
+      setStageTransform(resolvedAvatar.transformDefaults);
+      setWatermarkVisible(resolvedAvatar.watermark?.enabledByDefault ?? false);
+      setActiveExpressionMix([{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }]);
+      setLastDirective(null);
+
+      if (!hasResolvedInitialAvatar.current) {
+        hasResolvedInitialAvatar.current = true;
+        return;
+      }
+
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Switched to ${resolvedAvatar.name}.`,
+          expression: getAvatarNeutralExpressionId(resolvedAvatar),
+          expressionMix: [{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }],
+          meta: 'system',
+        },
+      ]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAvatarId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,21 +193,7 @@ export default function App() {
   }
 
   function handleAvatarChange(avatarId: string) {
-    const neutralMix = createNeutralMix(avatarId);
     setSelectedAvatarId(avatarId);
-    setStageTransform(avatars[avatarId].transformDefaults);
-    setActiveExpressionMix(neutralMix);
-    setLastDirective(null);
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `Switched to ${avatars[avatarId].name}.`,
-        expression: getAvatarNeutralExpressionId(avatars[avatarId]),
-        expressionMix: neutralMix,
-        meta: 'system',
-      },
-    ]);
   }
 
   function updateTransform(patch: Partial<StageTransform>) {
@@ -338,7 +362,7 @@ export default function App() {
         <div className="directive-grid">
           <div className="directive-box">
             <span>Blend</span>
-            <strong>{formatExpressionMix(selectedAvatarId, lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
+            <strong>{formatExpressionMix(selectedAvatar, lastDirective?.expressionMix ?? activeExpressionMix)}</strong>
           </div>
           <div className="directive-box">
             <span>Intensity</span>
@@ -359,7 +383,7 @@ export default function App() {
               <header>
                 <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
                 {message.expressionMix?.length ? (
-                  <span>{formatExpressionMix(selectedAvatarId, message.expressionMix)}</span>
+                  <span>{formatExpressionMix(selectedAvatar, message.expressionMix)}</span>
                 ) : message.expression ? (
                   <span>{getAvatarExpressionLabel(selectedAvatar, message.expression)}</span>
                 ) : null}
