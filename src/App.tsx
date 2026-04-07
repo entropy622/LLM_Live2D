@@ -443,7 +443,7 @@ export default function App() {
       </section>
 
       {settingsOpen ? (
-        <div className="settings-modal-backdrop">
+        <div className="settings-modal-backdrop" onClick={handleCloseSettings}>
           <section
             className="settings-modal"
             onClick={(event) => event.stopPropagation()}
