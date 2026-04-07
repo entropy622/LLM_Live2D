@@ -33,6 +33,11 @@ type CreateAssistantResponseArgs = {
   systemPrompt: string;
 };
 
+type RemoteMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
 export type LlmSettings = {
   apiUrl: string;
   apiKey: string;
@@ -252,6 +257,41 @@ function getOngoingAvatarState(avatar: AvatarManifest, history: ChatMessage[]) {
   return formatHistoryState(avatar, latestAssistantMessage?.expressionMix);
 }
 
+async function fetchRemoteCompletion(
+  apiUrl: string,
+  apiKey: string,
+  model: string,
+  messages: RemoteMessage[],
+  temperature: number,
+) {
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature,
+      max_tokens: 400,
+      response_format: {
+        type: 'json_object',
+      },
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new LlmConnectionError(`Remote LLM failed with ${response.status}`, response.status);
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  return payload.choices?.[0]?.message?.content ?? '';
+}
+
 async function requestRemoteAssistant({
   avatar,
   history,
@@ -269,49 +309,35 @@ async function requestRemoteAssistant({
     );
   }
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.8,
-      max_tokens: 400,
-      response_format: {
-        type: 'json_object',
+  const baseMessages: RemoteMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...(ongoingAvatarState
+      ? [{
+          role: 'system' as const,
+          content: `Ongoing avatar control state before the next reply: [avatar_state ${ongoingAvatarState}]`,
+        }]
+      : []),
+    ...history.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+  ];
+
+  let content = await fetchRemoteCompletion(apiUrl, apiKey, model, baseMessages, 0.8);
+  let parsed = parseAssistantPayload(content);
+
+  if (!content.trim() || !parsed) {
+    const retryMessages: RemoteMessage[] = [
+      ...baseMessages,
+      {
+        role: 'system',
+        content:
+          'Your previous output was invalid. Reply again with exactly one non-empty JSON object matching the required schema. Do not output whitespace. Do not output an empty string.',
       },
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...(ongoingAvatarState
-          ? [{
-              role: 'system' as const,
-              content: `Ongoing avatar control state before the next reply: [avatar_state ${ongoingAvatarState}]`,
-            }]
-          : []),
-        ...history.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new LlmConnectionError(`Remote LLM failed with ${response.status}`, response.status);
+    ];
+    content = await fetchRemoteCompletion(apiUrl, apiKey, model, retryMessages, 0.2);
+    parsed = parseAssistantPayload(content);
   }
-
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = payload.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new LlmConnectionError('Remote LLM returned an empty response.');
-  }
-
-  const parsed = parseAssistantPayload(content);
 
   if (!parsed) {
     throw new LlmResponseFormatError(
