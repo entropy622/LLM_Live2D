@@ -3,6 +3,9 @@
 一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在生成回复文本的同时控制角色表情，动作以及一些更细致的参数。
 
 体验地址：`https://entropy622.github.io/LLM_Live2D/`
+<img width="2559" height="1344" alt="image" src="https://github.com/user-attachments/assets/8b6d4055-272e-42c6-9ce8-926adad02cca" />
+
+<img width="2559" height="1351" alt="image" src="https://github.com/user-attachments/assets/2eadc6fa-3680-408f-9410-9f69263fbe45" />
 
 <img width="2559" height="1353" alt="image" src="https://github.com/user-attachments/assets/7e294840-e27d-4886-92ec-4663e7564ce7" />
 
@@ -174,4 +177,4 @@ pnpm preview
 
 感谢 [MoeChat](https://github.com/Mios-dream/MoeChat) 这个仓库以及其作者的实现思路。
 
-当前项目的 Live2D 参数控制、参数白名单、平滑 overlay 等实现方向，参考了它“LLM 先生成受约束的动作语义，再由本地规则安全写入模型”的设计思路，并结合本项目的纯前端架构做了简化与改造。
+当前项目的 Live2D 参数控制、参数白名单、平滑 overlay 参考了作者的实现。
