@@ -5,6 +5,7 @@ import type {
   AvatarExpression,
   ExpressionBinding,
   ExpressionLayer,
+  ParameterOverride,
 } from './avatarManifest.ts';
 
 declare global {
@@ -17,6 +18,8 @@ declare global {
 type RuntimeState = {
   model: Live2DModel;
   activeParams: Map<string, number> | null;
+  overlayCurrentParams: Map<string, number>;
+  overlayTargetParams: Map<string, number>;
   baselineParams: Map<string, number>;
   trackedParamIds: Set<string>;
   app: PIXI.Application;
@@ -26,6 +29,7 @@ type RuntimeState = {
   currentTransform: StageTransform;
   resolvedBindingCache: Map<string, ResolvedBinding>;
   expressionMix: ExpressionLayer[];
+  parameterOverrides: ParameterOverride[];
   watermarkVisible: boolean;
 };
 
@@ -119,16 +123,36 @@ function toRelativeAssetPath(modelJson: string, assetPath: string) {
   return assetPath.replace(modelDirectory, '');
 }
 
-function applyBaseline(runtime: RuntimeState) {
-  const coreModel = getCoreModel(runtime);
-
-  for (const paramId of runtime.trackedParamIds) {
-    const baseline = runtime.baselineParams.get(paramId);
-
-    if (baseline !== undefined) {
-      coreModel.setParameterValueById(paramId, baseline);
-    }
+function easeTowards(current: number, target: number, factor: number) {
+  if (Math.abs(target - current) <= 0.0005) {
+    return target;
   }
+
+  return current + (target - current) * factor;
+}
+
+function getOverlayFactor(paramId: string, hasExplicitTarget: boolean) {
+  if (/^ParamEyeBall[XY]$/i.test(paramId)) {
+    return hasExplicitTarget ? 0.24 : 0.16;
+  }
+
+  if (/^(ParamAngle|ParamBodyAngle)/i.test(paramId)) {
+    return hasExplicitTarget ? 0.14 : 0.09;
+  }
+
+  if (/^Param(Brow|Cheek)/i.test(paramId)) {
+    return hasExplicitTarget ? 0.18 : 0.12;
+  }
+
+  if (/^ParamMouthOpenY$/i.test(paramId)) {
+    return hasExplicitTarget ? 0.22 : 0.14;
+  }
+
+  if (/^ParamMouthForm$/i.test(paramId)) {
+    return hasExplicitTarget ? 0.18 : 0.12;
+  }
+
+  return hasExplicitTarget ? 0.16 : 0.1;
 }
 
 function ensureTrackedBaseline(runtime: RuntimeState, paramId: string) {
@@ -232,6 +256,7 @@ async function buildMixedParameters(
   runtime: RuntimeState,
   avatar: AvatarManifest,
   expressionMix: ExpressionLayer[],
+  parameterOverrides: ParameterOverride[],
   watermarkVisible: boolean,
 ) {
   const nextParams = new Map<string, number>();
@@ -252,6 +277,11 @@ async function buildMixedParameters(
     for (const binding of avatar.watermark.bindings) {
       await mergeBindingIntoParameters(runtime, nextParams, binding, 1);
     }
+  }
+
+  for (const parameterOverride of parameterOverrides) {
+    ensureTrackedBaseline(runtime, parameterOverride.id);
+    nextParams.set(parameterOverride.id, parameterOverride.value);
   }
 
   return nextParams;
@@ -316,6 +346,8 @@ export async function createLive2DRuntime(
   const runtime: RuntimeState = {
     model,
     activeParams: null,
+    overlayCurrentParams: new Map(),
+    overlayTargetParams: new Map(),
     baselineParams: new Map(),
     trackedParamIds: new Set(),
     app,
@@ -325,18 +357,26 @@ export async function createLive2DRuntime(
     currentTransform: avatar.transformDefaults,
     resolvedBindingCache: new Map(),
     expressionMix: [],
+    parameterOverrides: [],
     watermarkVisible: avatar.watermark?.enabledByDefault ?? false,
   };
 
   app.ticker.add(() => {
-    if (!runtime.activeParams) {
+    if (runtime.trackedParamIds.size === 0) {
       return;
     }
 
     const coreModel = getCoreModel(runtime);
 
-    for (const [paramId, value] of runtime.activeParams.entries()) {
-      coreModel.setParameterValueById(paramId, value);
+    for (const paramId of runtime.trackedParamIds) {
+      const baseline = runtime.baselineParams.get(paramId) ?? 0;
+      const hasExplicitTarget = runtime.overlayTargetParams.has(paramId);
+      const target = runtime.overlayTargetParams.get(paramId) ?? baseline;
+      const current = runtime.overlayCurrentParams.get(paramId) ?? baseline;
+      const next = easeTowards(current, target, getOverlayFactor(paramId, hasExplicitTarget));
+
+      runtime.overlayCurrentParams.set(paramId, next);
+      coreModel.setParameterValueById(paramId, next);
     }
   });
 
@@ -363,12 +403,25 @@ export async function setWatermarkVisibility(
   await applyRuntimeState(runtime, avatar);
 }
 
+export async function setParameterOverrides(
+  runtime: RuntimeState,
+  avatar: AvatarManifest,
+  parameterOverrides: ParameterOverride[],
+) {
+  runtime.parameterOverrides = parameterOverrides;
+  await applyRuntimeState(runtime, avatar);
+}
+
 async function applyRuntimeState(runtime: RuntimeState, avatar: AvatarManifest) {
   runtime.model.internalModel.motionManager.expressionManager?.resetExpression();
 
-  if (runtime.expressionMix.length === 0 && !(runtime.watermarkVisible && avatar.watermark)) {
+  if (
+    runtime.expressionMix.length === 0
+    && runtime.parameterOverrides.length === 0
+    && !(runtime.watermarkVisible && avatar.watermark)
+  ) {
     runtime.activeParams = null;
-    applyBaseline(runtime);
+    runtime.overlayTargetParams = new Map();
     return;
   }
 
@@ -376,22 +429,18 @@ async function applyRuntimeState(runtime: RuntimeState, avatar: AvatarManifest) 
     runtime,
     avatar,
     runtime.expressionMix,
+    runtime.parameterOverrides,
     runtime.watermarkVisible,
   );
 
   if (mixedParams.size === 0) {
     runtime.activeParams = null;
-    applyBaseline(runtime);
+    runtime.overlayTargetParams = new Map();
     return;
   }
 
   runtime.activeParams = mixedParams;
-  applyBaseline(runtime);
-
-  const coreModel = getCoreModel(runtime);
-  for (const [paramId, value] of mixedParams.entries()) {
-    coreModel.setParameterValueById(paramId, value);
-  }
+  runtime.overlayTargetParams = mixedParams;
 }
 
 export function resizeRuntime(runtime: RuntimeState, container: HTMLElement) {

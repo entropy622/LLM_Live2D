@@ -1,14 +1,13 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
   avatarList,
   getAvatarById,
-  getAvatarExpression,
-  getAvatarExpressionLabel,
   getAvatarNeutralExpressionId,
   resolveAvatarManifestById,
   type AvatarManifest,
   type ExpressionLayer,
+  type ParameterOverride,
 } from './features/live2d/avatarManifest.ts';
 import {
   createAssistantResponse,
@@ -19,8 +18,8 @@ import {
   LlmResponseFormatError,
   loadStoredLlmSettings,
   saveStoredLlmSettings,
-  type ChatMessage,
   type LlmSettings,
+  type ChatMessage,
 } from './lib/llm.ts';
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
@@ -43,20 +42,6 @@ const starterMessages: ChatMessage[] = [
   },
 ];
 
-function formatExpressionMix(avatar: AvatarManifest, expressionMix: ExpressionLayer[]) {
-  return expressionMix
-    .map((layer) => {
-      const expressionItem = getAvatarExpression(avatar, layer.key);
-      const label = getAvatarExpressionLabel(avatar, layer.key);
-      if (expressionItem?.kind && expressionItem.kind !== 'emotion') {
-        return label;
-      }
-
-      return `${label} ${Math.round(layer.weight * 100)}%`;
-    })
-    .join(' + ');
-}
-
 export default function App() {
   const hasResolvedInitialAvatar = useRef(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState(defaultAvatarId);
@@ -67,8 +52,10 @@ export default function App() {
   const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(
     createNeutralMix(defaultAvatarId),
   );
+  const [activeParameterOverrides, setActiveParameterOverrides] = useState<ParameterOverride[]>([]);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [controlDrawerOpen, setControlDrawerOpen] = useState(false);
   const [watermarkVisible, setWatermarkVisible] = useState(
     selectedAvatar.watermark?.enabledByDefault ?? false,
   );
@@ -80,6 +67,10 @@ export default function App() {
     selectedAvatar.transformDefaults,
   );
   const visibleExpressions = selectedAvatar.expressions;
+  const activeParameterMap = useMemo(
+    () => new Map(activeParameterOverrides.map((parameterOverride) => [parameterOverride.id, parameterOverride.value])),
+    [activeParameterOverrides],
+  );
 
   useEffect(() => {
     setLlmSettings(loadStoredLlmSettings());
@@ -101,6 +92,8 @@ export default function App() {
       setStageTransform(resolvedAvatar.transformDefaults);
       setWatermarkVisible(resolvedAvatar.watermark?.enabledByDefault ?? false);
       setActiveExpressionMix([{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }]);
+      setActiveParameterOverrides([]);
+      setControlDrawerOpen(false);
 
       if (!hasResolvedInitialAvatar.current) {
         hasResolvedInitialAvatar.current = true;
@@ -151,6 +144,7 @@ export default function App() {
       });
 
       setActiveExpressionMix(response.expressionMix);
+      setActiveParameterOverrides(response.parameterOverrides);
       setMessages((current) => [
         ...current,
         {
@@ -159,6 +153,7 @@ export default function App() {
           content: response.reply,
           expression: response.expression,
           expressionMix: response.expressionMix,
+          parameterOverrides: response.parameterOverrides,
           meta: response.source,
         },
       ]);
@@ -223,6 +218,19 @@ export default function App() {
     setSettingsOpen(false);
   }
 
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || !event.ctrlKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const form = event.currentTarget.form;
+    if (form) {
+      form.requestSubmit();
+    }
+  }
+
   return (
     <div className="app-shell">
       <section className="viewer-panel">
@@ -266,6 +274,7 @@ export default function App() {
         <Live2DStage
           avatar={selectedAvatar}
           expressionMix={activeExpressionMix}
+          parameterOverrides={activeParameterOverrides}
           watermarkVisible={!watermarkVisible}
           transform={stageTransform}
           onTransformChange={setStageTransform}
@@ -333,16 +342,58 @@ export default function App() {
               </button>
             ) : null}
           </div>
-          <div className="chip-row">
-            {visibleExpressions.map((expression) => (
-              <span
-                key={expression.id}
-                className={activeExpressionKeys.has(expression.id) ? 'chip active readonly' : 'chip readonly'}
-              >
-                {expression.label}
+          <section className={`control-drawer ${controlDrawerOpen ? 'is-open' : ''}`}>
+            <button
+              type="button"
+              className="control-drawer-toggle"
+              aria-expanded={controlDrawerOpen}
+              onClick={() => setControlDrawerOpen((current) => !current)}
+            >
+              <span>Model Controls</span>
+              <span className="control-drawer-toggle-meta">
+                {visibleExpressions.length} expressions
+                {activeParameterOverrides.length ? ` · ${activeParameterOverrides.length} params` : ''}
               </span>
-            ))}
-          </div>
+            </button>
+            {controlDrawerOpen ? (
+              <div className="control-drawer-body">
+                <div className="control-drawer-section">
+                  <p className="control-drawer-label">Expressions</p>
+                  <div className="chip-row">
+                    {visibleExpressions.map((expression) => (
+                      <span
+                        key={expression.id}
+                        className={activeExpressionKeys.has(expression.id) ? 'chip active readonly' : 'chip readonly'}
+                      >
+                        {expression.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="control-drawer-section">
+                  <p className="control-drawer-label">Params</p>
+                  <div className="chip-row">
+                    {(selectedAvatar.parameterControls?.length ?? 0) > 0 ? (
+                      selectedAvatar.parameterControls!.map((parameterControl) => {
+                        const activeValue = activeParameterMap.get(parameterControl.id);
+                        return (
+                          <span
+                            key={parameterControl.id}
+                            className={activeValue !== undefined ? 'chip active readonly' : 'chip readonly'}
+                          >
+                            {parameterControl.label}
+                            {activeValue !== undefined ? ` ${activeValue.toFixed(2)}` : ''}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="chip readonly">No discovered params</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
         </div>
       </section>
 
@@ -370,11 +421,6 @@ export default function App() {
             >
               <header>
                 <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
-                {message.expressionMix?.length ? (
-                  <span>{formatExpressionMix(selectedAvatar, message.expressionMix)}</span>
-                ) : message.expression ? (
-                  <span>{getAvatarExpressionLabel(selectedAvatar, message.expression)}</span>
-                ) : null}
               </header>
               <p>{message.content}</p>
               {message.meta ? <small>{message.meta}</small> : null}
@@ -386,6 +432,7 @@ export default function App() {
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
             placeholder="Try: she sounds happy but a little shy, or: that's suspicious and kind of playful."
             rows={4}
           />

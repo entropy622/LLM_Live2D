@@ -354,6 +354,57 @@ button {
   gap: 10px;
 }
 
+.control-drawer {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.control-drawer.is-open {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.control-drawer-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f2e7d7;
+  text-align: left;
+}
+
+.control-drawer-toggle-meta {
+  color: #a8abaf;
+  font-size: 0.8rem;
+}
+
+.control-drawer-body {
+  display: grid;
+  gap: 14px;
+}
+
+.control-drawer-section {
+  display: grid;
+  gap: 10px;
+}
+
+.control-drawer-label {
+  margin: 0;
+  color: #cabfae;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .chip {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
@@ -484,7 +535,7 @@ button {
 
 .message header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   color: #f5ebdd;
   min-width: 0;

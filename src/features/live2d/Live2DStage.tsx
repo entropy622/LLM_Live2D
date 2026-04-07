@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { AvatarManifest, ExpressionLayer } from './avatarManifest.ts';
+import type { AvatarManifest, ExpressionLayer, ParameterOverride } from './avatarManifest.ts';
 import {
   applyExpressionMix,
   createLive2DRuntime,
@@ -7,6 +7,7 @@ import {
   focusRuntime,
   resetRuntimeFocus,
   resizeRuntime,
+  setParameterOverrides,
   setWatermarkVisibility,
   updateStageTransform,
   type StageTransform,
@@ -15,6 +16,7 @@ import {
 type Live2DStageProps = {
   avatar: AvatarManifest;
   expressionMix: ExpressionLayer[];
+  parameterOverrides: ParameterOverride[];
   watermarkVisible: boolean;
   transform: StageTransform;
   onTransformChange: (transform: StageTransform) => void;
@@ -35,6 +37,7 @@ function clamp(value: number, min: number, max: number) {
 export function Live2DStage({
   avatar,
   expressionMix,
+  parameterOverrides,
   watermarkVisible,
   transform,
   onTransformChange,
@@ -114,6 +117,17 @@ export function Live2DStage({
         setStatus('Expression failed');
       });
   }, [avatar, expressionMix]);
+
+  useEffect(() => {
+    if (!runtimeRef.current) {
+      return;
+    }
+
+    void setParameterOverrides(runtimeRef.current, avatar, parameterOverrides).catch((error) => {
+      console.error(error);
+      setStatus('Parameter failed');
+    });
+  }, [avatar, parameterOverrides]);
 
   useEffect(() => {
     if (!runtimeRef.current) {
