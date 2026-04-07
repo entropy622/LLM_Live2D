@@ -1,6 +1,6 @@
 # LLM Live2D
 
-一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在生成回复文本的同时控制角色表情与参数。
+一个面向实验的前端项目：把 Live2D 接入 LLM 对话流程，让 LLM 在生成回复文本的同时控制角色表情，动作以及一些更细致的参数。
 
 体验地址：`https://entropy622.github.io/LLM_Live2D/`
 
@@ -8,9 +8,9 @@
 
 ## 背景
 
-这个项目受 `Neuro Sama` 一类的 AI 角色交互形态启发。
+这个项目受 `Neuro Sama` 启发。
 
-很多同类项目可以把 Live2D 接到聊天界面里，但不一定会把 LLM 输出进一步约束成结构化的表情和参数控制。这个项目的目标，是把这条链路做成一个更干净、更可扩展的前端实验场。
+社区复刻`Neuro Sama` 项目，比如`Airi`，并不支持LLM去直接控制Live2D的各种expression key。这个项目是为了补齐这一点。
 
 ## 当前能力
 
@@ -161,12 +161,12 @@ pnpm preview
 ## 模型作者
 
 - `Yumi`：Erara_艾拉拉
-- `草莓兔兔`：糖系锦鲤
+- `草莓兔兔`：糖糖锦鲤
 - `冰糖`：神宫凉子
 - `Ellen`：神宫凉子
-- `Rabbit Hole`：北酱qwQ
-- `Fu Xuan`：白沫Baily
-- `Huo Huo`：白沫Baily
+- `Rabbit Hole`：北酱OwQ
+- `Fu Xuan`：白泠Baily
+- `Huo Huo`：白泠Baily
 
 感谢模型作者的创作与分享。
 
