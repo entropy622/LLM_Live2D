@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Live2DStage } from './features/live2d/Live2DStage.tsx';
 import {
   avatarList,
@@ -228,6 +228,19 @@ export default function App() {
     setSettingsOpen(false);
   }
 
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || !event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const form = event.currentTarget.form;
+    if (form) {
+      form.requestSubmit();
+    }
+  }
+
   return (
     <div className="app-shell">
       <section className="viewer-panel">
@@ -392,6 +405,7 @@ export default function App() {
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
             placeholder="Try: she sounds happy but a little shy, or: that's suspicious and kind of playful."
             rows={4}
           />

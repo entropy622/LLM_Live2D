@@ -442,7 +442,8 @@ export function createSystemPrompt(avatar: AvatarManifest) {
           availableParameters,
           'Use direct parameter overrides sparingly. Prefer expressionMix for coarse emotion, and use parameterOverrides only for small refinements.',
           'Only emit parameter ids from the whitelist. Never invent parameter ids.',
-          'parameterOverrides must be an array of objects like {"id":"ParamMouthOpenY","value":0.35}.',
+          'Do not control lip-sync or mouth opening with parameterOverrides. Mouth opening is reserved for audio-driven lip sync.',
+          'parameterOverrides must be an array of objects like {"id":"ParamEyeBallX","value":0.18}.',
           'Keep parameterOverrides short. Use at most four items.',
         ]
       : [
@@ -469,7 +470,7 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     'intensity must be a number between 0 and 1.',
     'durationMs must be an integer number of milliseconds.',
     'Example JSON:',
-    '{"reply":"Sounds good, let us play together.","expression":"gaming","expressionMix":[{"expression":"gaming","weight":1},{"expression":"starry_eyes","weight":0.8}],"parameterOverrides":[{"id":"ParamMouthOpenY","value":0.32},{"id":"ParamEyeBallX","value":0.18}],"intensity":0.9,"durationMs":3000}',
+    '{"reply":"Sounds good, let us play together.","expression":"gaming","expressionMix":[{"expression":"gaming","weight":1},{"expression":"starry_eyes","weight":0.8}],"parameterOverrides":[{"id":"ParamEyeBallX","value":0.18},{"id":"ParamCheek","value":0.42}],"intensity":0.9,"durationMs":3000}',
   ].join('\n');
 }
 

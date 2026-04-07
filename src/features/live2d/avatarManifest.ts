@@ -83,6 +83,67 @@ export type AvatarManifest = {
 
 type AvatarResolver = () => Promise<AvatarManifest>;
 
+type ModelJsonPayload = {
+  FileReferences?: {
+    DisplayInfo?: string;
+    Expressions?: Array<{
+      Name?: string;
+      File?: string;
+    }>;
+  };
+};
+
+type Cdi3Payload = {
+  Parameters?: Array<{
+    Id?: string;
+    Name?: string;
+  }>;
+};
+
+type VtubePayload = {
+  ParameterSettings?: Array<{
+    Name?: string;
+    OutputLive2D?: string;
+    OutputRangeLower?: number;
+    OutputRangeUpper?: number;
+  }>;
+};
+
+type DiscoveredParameterInfo = {
+  id: ParameterId;
+  name?: string;
+  min?: number;
+  max?: number;
+};
+
+const genericParameterCatalog = [
+  { id: 'ParamAngleX', label: 'Head Turn X', prompt: 'turn head left or right', fallbackMin: -30, fallbackMax: 30 },
+  { id: 'ParamAngleY', label: 'Head Tilt Y', prompt: 'tilt head up or down', fallbackMin: -30, fallbackMax: 30 },
+  { id: 'ParamAngleZ', label: 'Head Roll Z', prompt: 'roll head sideways', fallbackMin: -30, fallbackMax: 30 },
+  { id: 'ParamBodyAngleX', label: 'Body Turn X', prompt: 'rotate upper body left or right', fallbackMin: -15, fallbackMax: 15 },
+  { id: 'ParamBodyAngleY', label: 'Body Turn Y', prompt: 'lean upper body forward or backward', fallbackMin: -10, fallbackMax: 10 },
+  { id: 'ParamBodyAngleZ', label: 'Body Roll Z', prompt: 'roll upper body sideways', fallbackMin: -15, fallbackMax: 15 },
+  { id: 'ParamEyeBallX', label: 'Eye Look X', prompt: 'shift gaze left or right', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamEyeBallY', label: 'Eye Look Y', prompt: 'shift gaze up or down', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamBrowLY', label: 'Left Brow Y', prompt: 'raise or lower the left eyebrow', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamBrowRY', label: 'Right Brow Y', prompt: 'raise or lower the right eyebrow', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamBrowLAngle', label: 'Left Brow Angle', prompt: 'tilt the left eyebrow angle', fallbackMin: -30, fallbackMax: 30 },
+  { id: 'ParamBrowRAngle', label: 'Right Brow Angle', prompt: 'tilt the right eyebrow angle', fallbackMin: -30, fallbackMax: 30 },
+  { id: 'ParamBrowLForm', label: 'Left Brow Form', prompt: 'change the left eyebrow toward soft or tense form', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamBrowRForm', label: 'Right Brow Form', prompt: 'change the right eyebrow toward soft or tense form', fallbackMin: -1, fallbackMax: 1 },
+  { id: 'ParamCheek', label: 'Cheek Flush', prompt: 'increase cheek blush intensity', fallbackMin: 0, fallbackMax: 1 },
+  { id: 'ParamMouthForm', label: 'Mouth Form', prompt: 'shape the mouth toward smile or pout', fallbackMin: -1, fallbackMax: 1 },
+] as const;
+
+const expressionAssetModules = import.meta.glob('../../../public/live2D/**/*.exp3.json', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+const avatarResolvers = new Map<string, AvatarResolver>();
+const avatarResolutionCache = new Map<string, Promise<AvatarManifest>>();
+
 function publicAsset(assetPath: string) {
   return `${import.meta.env.BASE_URL}${assetPath.replace(/^\/+/, '')}`;
 }
@@ -95,53 +156,26 @@ function createModelTransform(scale = 1, offsetX = 0, offsetY = 0) {
   };
 }
 
-function expression(
-  id: ExpressionId,
-  label: string,
-  prompt: string,
-  binding: ExpressionBinding,
-  aliases: string[] = [],
-  kind: ExpressionKind = 'emotion',
-): AvatarExpression {
-  return {
-    id,
-    label,
-    kind,
-    prompt,
-    binding,
-    aliases,
-  };
+function parameterControl(id: ParameterId, label: string, prompt: string, min: number, max: number): AvatarParameterControl {
+  return { id, label, prompt, min, max };
 }
 
-function parameterControl(
-  id: ParameterId,
-  label: string,
-  prompt: string,
-  min: number,
-  max: number,
-): AvatarParameterControl {
+function baseAvatar(
+  avatar: Omit<AvatarManifest, 'expressions' | 'parameterControls' | 'transformDefaults'> & {
+    transformDefaults?: AvatarManifest['transformDefaults'];
+  },
+): AvatarManifest {
   return {
-    id,
-    label,
-    prompt,
-    min,
-    max,
+    ...avatar,
+    expressions: [],
+    parameterControls: [],
+    transformDefaults: avatar.transformDefaults ?? {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    },
   };
 }
-
-const rabbitFolder = publicAsset('live2D/\u5154\u5b50\u6d1e');
-const rabbitModel = `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`;
-const rabbitMotion = `${rabbitFolder}/motions`;
-
-const ellenFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u827e\u83b2');
-const bingtangFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6');
-const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u51541');
-const strawberryTrialFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
-const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
-const huohuoFolder = publicAsset('live2D/\u85ff\u85ff');
-
-const avatarResolvers = new Map<string, AvatarResolver>();
-const avatarResolutionCache = new Map<string, Promise<AvatarManifest>>();
 
 async function assetExists(assetPath: string) {
   try {
@@ -161,299 +195,336 @@ async function assetExists(assetPath: string) {
   }
 }
 
-function createStrawberryBunnyManifest(
-  folder: string,
-  summary: string,
-  modelJsonFile: string,
-  expressionSet: 'full' | 'trial',
-): AvatarManifest {
-  const expressions: AvatarExpression[] = [
-    expression(
-      'neutral',
-      'Neutral',
-      'default calm face with no extra expression overlays',
-      {
-        mode: 'preset',
-        params: {
-          Param2: 0,
-          Param3: 0,
-          Param6: 0,
-          Param7: 0,
-        },
-      },
-      ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-    ),
-    expression(
-      'starry_eyes',
-      'Starry Eyes',
-      'bright delighted star eyes',
-      { mode: 'file', file: `${folder}/expressions/\u661f\u661f\u773c.exp3.json` },
-      ['happy', 'excited', 'starry', 'delighted', '\u5f00\u5fc3', '\u6fc0\u52a8'],
-    ),
-    expression(
-      'heart_eyes',
-      'Heart Eyes',
-      'heart-shaped loving eyes',
-      { mode: 'file', file: `${folder}/expressions/\u7231\u5fc3.exp3.json` },
-      ['love', 'heart', 'adoring', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
-    ),
-    expression(
-      'blush',
-      'Blush',
-      'soft blushing embarrassed face',
-      { mode: 'file', file: `${folder}/expressions/\u7ea2\u8138.exp3.json` },
-      ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
-    ),
-    expression(
-      'dark_face',
-      'Dark Face',
-      'dark-faced angry or upset mood',
-      { mode: 'file', file: `${folder}/expressions/\u9ed1\u8138.exp3.json` },
-      ['angry', 'mad', 'dark', 'annoyed', '\u751f\u6c14', '\u9ed1\u8138'],
-    ),
-  ];
+async function fetchOptionalJson<T>(assetPath: string) {
+  try {
+    const response = await fetch(assetPath);
+    if (!response.ok) {
+      return null;
+    }
 
-  if (expressionSet === 'full') {
-    expressions.push(
-      expression(
-        'tears',
-        'Tears',
-        'crying face with visible tears',
-        { mode: 'file', file: `${folder}/expressions/\u54ed\u54ed.exp3.json` },
-        ['sad', 'cry', 'tears', 'upset', '\u54ed', '\u96be\u8fc7'],
-      ),
-      expression(
-        'finger_heart',
-        'Finger Heart',
-        'cute pose making a finger heart',
-        { mode: 'file', file: `${folder}/expressions/\u6bd4\u5fc3.exp3.json` },
-        ['love', 'heart', 'finger heart', 'cute', '\u6bd4\u5fc3', '\u793a\u7231'],
-        'pose',
-      ),
-      expression(
-        'tongue_out',
-        'Tongue Out',
-        'playful tongue-out face',
-        { mode: 'file', file: `${folder}/expressions/\u5410\u820c.exp3.json` },
-        ['tongue', 'playful', 'teasing', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
-      ),
-      expression(
-        'dizzy',
-        'Dizzy',
-        'dizzy or overwhelmed expression',
-        { mode: 'file', file: `${folder}/expressions/\u6655\u6655.exp3.json` },
-        ['dizzy', 'dazed', 'overwhelmed', 'surprised', '\u6655', '\u61f5'],
-      ),
-      expression(
-        'sweat',
-        'Sweat',
-        'nervous or awkward sweating face',
-        { mode: 'file', file: `${folder}/expressions/\u6d41\u6c57.exp3.json` },
-        ['sweat', 'nervous', 'awkward', 'anxious', '\u6d41\u6c57', '\u7d27\u5f20'],
-      ),
-      expression(
-        'question',
-        'Question',
-        'confused expression with a question mark cue',
-        { mode: 'file', file: `${folder}/expressions/\u95ee\u53f7.exp3.json` },
-        ['question', 'confused', 'puzzled', 'uncertain', '\u95ee\u53f7', '\u7591\u60d1'],
-      ),
-      expression(
-        'angry',
-        'Angry',
-        'clearly angry face',
-        { mode: 'file', file: `${folder}/expressions/\u751f\u6c14.exp3.json` },
-        ['angry', 'mad', 'furious', '\u751f\u6c14', '\u6124\u6012'],
-      ),
-      expression(
-        'dark_mode',
-        'Dark Mode',
-        'more dramatic blackened mood',
-        { mode: 'file', file: `${folder}/expressions/\u9ed1\u5316.exp3.json` },
-        ['dark', 'blackened', 'sinister', '\u9ed1\u5316', '\u9634\u6697'],
-      ),
-      expression(
-        'anxious',
-        'Anxious',
-        'urgent and flustered expression',
-        { mode: 'file', file: `${folder}/expressions/\u7740\u6025.exp3.json` },
-        ['anxious', 'urgent', 'flustered', 'worried', '\u7740\u6025', '\u7126\u6025'],
-      ),
-      expression(
-        'flowers',
-        'Flowers',
-        'romantic flowers effect around the face',
-        { mode: 'file', file: `${folder}/expressions/\u82b1\u82b1.exp3.json` },
-        ['flowers', 'romantic', 'dreamy', '\u82b1\u82b1', '\u6d6a\u6f2b'],
-        'effect',
-      ),
-      expression(
-        'gaming',
-        'Gaming',
-        'gaming prop expression with a controller setup',
-        { mode: 'file', file: `${folder}/expressions/\u6253\u6e38\u620f.exp3.json` },
-        ['gaming', 'gamepad', 'controller', '\u6253\u6e38\u620f', '\u73a9\u6e38\u620f'],
-        'prop',
-      ),
-      expression(
-        'microphone',
-        'Microphone',
-        'performance pose with a microphone',
-        { mode: 'file', file: `${folder}/expressions/\u8bdd\u7b52.exp3.json` },
-        ['microphone', 'singing', 'performance', '\u8bdd\u7b52', '\u5531\u6b4c'],
-        'prop',
-      ),
-    );
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function getModelDirectory(modelJson: string) {
+  return modelJson.slice(0, modelJson.lastIndexOf('/') + 1);
+}
+
+function resolveRelativeAsset(modelJson: string, assetPath: string) {
+  if (/^https?:\/\//i.test(assetPath) || assetPath.startsWith(import.meta.env.BASE_URL)) {
+    return assetPath;
   }
 
-  const parameterControls = expressionSet === 'full'
-    ? [
-        parameterControl('ParamAngleX', 'Head Turn X', 'turn head left or right', -30, 30),
-        parameterControl('ParamAngleY', 'Head Tilt Y', 'tilt head up or down', -30, 30),
-        parameterControl('ParamAngleZ', 'Head Roll Z', 'roll head sideways', -30, 30),
-        parameterControl('ParamBodyAngleX', 'Body Turn X', 'rotate upper body left or right', -10, 10),
-        parameterControl('ParamEyeBallX', 'Eye Look X', 'shift gaze left or right', -1, 1),
-        parameterControl('ParamEyeBallY', 'Eye Look Y', 'shift gaze up or down', -1, 1),
-        parameterControl('ParamBrowLY', 'Left Brow Y', 'raise or lower the left eyebrow', -1, 1),
-        parameterControl('ParamBrowRY', 'Right Brow Y', 'raise or lower the right eyebrow', -1, 1),
-        parameterControl('ParamMouthOpenY', 'Mouth Open', 'open the mouth vertically', 0, 1),
-        parameterControl('ParamMouthForm', 'Mouth Form', 'shape the mouth toward smile or pout', -1, 1),
-        parameterControl('ParamCheek', 'Cheek Flush', 'increase cheek blush intensity', 0, 1),
-      ]
-    : undefined;
+  return `${getModelDirectory(modelJson)}${assetPath.replace(/^\.?\/+/, '')}`;
+}
+
+function createVtubeCandidatePath(modelJson: string) {
+  return modelJson.replace(/\.model3\.json$/i, '.vtube.json');
+}
+
+function stripBaseUrl(assetPath: string) {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  return assetPath.startsWith(baseUrl) ? assetPath.slice(baseUrl.length) : assetPath.replace(/^\/+/, '');
+}
+
+function normalizeExpressionFileName(value: string) {
+  return value.replace(/\.exp3\.json$/i, '').trim();
+}
+
+function toExpressionId(value: string) {
+  const normalized = normalizeExpressionFileName(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^\p{L}\p{N}_]+/gu, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return normalized || 'expression';
+}
+
+function toExpressionLabel(value: string) {
+  const normalized = normalizeExpressionFileName(value);
+  if (/[\u4e00-\u9fff]/u.test(normalized)) {
+    return normalized;
+  }
+
+  return normalized
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function inferExpressionKind(value: string): ExpressionKind {
+  const normalized = normalizeExpressionFileName(value).toLowerCase();
+
+  if (/(flower|sparkle|effect|question|\?|花|问号|特效|汗|teardrop)/i.test(normalized)) {
+    return 'effect';
+  }
+
+  if (/(game|gaming|microphone|mic|pillow|flag|controller|话筒|抱枕|旗|游戏)/i.test(normalized)) {
+    return 'prop';
+  }
+
+  if (/(pose|hand|finger_heart|fingerheart|比心|手|姿势)/i.test(normalized)) {
+    return 'pose';
+  }
+
+  return 'emotion';
+}
+
+function createGenericExpressionPrompt(label: string, kind: ExpressionKind) {
+  if (kind === 'pose') {
+    return `pose cue "${label}"`;
+  }
+
+  if (kind === 'prop') {
+    return `prop or held-item cue "${label}"`;
+  }
+
+  if (kind === 'effect') {
+    return `visual effect cue "${label}"`;
+  }
+
+  return `facial expression cue "${label}"`;
+}
+
+function normalizeDiscoveredRange(
+  lower: number | undefined,
+  upper: number | undefined,
+  fallbackMin: number,
+  fallbackMax: number,
+) {
+  if (typeof lower !== 'number' || typeof upper !== 'number' || Number.isNaN(lower) || Number.isNaN(upper)) {
+    return { min: fallbackMin, max: fallbackMax };
+  }
 
   return {
-    id: 'strawberryBunny',
-    name: '\u8349\u8393\u5154\u5154',
-    summary,
-    persona: {
-      tone: 'sweet, clingy, and soft',
-      traits: ['cute', 'warm', 'affectionate', 'playfully dependent'],
-      styleRules: [
-        'Use soft and friendly wording.',
-        'Sound adorable rather than formal.',
-        'When happy, lean into sweetness and warmth.',
-      ],
-    },
-    modelJson: `${folder}/${modelJsonFile}`,
-    scaleMultiplier: 0.29,
-    verticalOffset: 0.08,
-    modelTransform: createModelTransform(0.98, 0, 0.01),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions,
-    parameterControls,
-    motions: {
-      idle: { file: `${folder}/motion/Scene1.motion3.json` },
-    },
-    watermark: {
-      enabledByDefault: false,
-      bindings: [{ mode: 'file', file: `${folder}/expressions/\u6c34\u5370.exp3.json` }],
-    },
+    min: Math.min(lower, upper),
+    max: Math.max(lower, upper),
   };
 }
 
-const strawberryBunnyFullManifest = createStrawberryBunnyManifest(
-  strawberryFolder,
-  'Extended expression set. Uses the private full asset pack when it exists locally.',
-  '\u8349\u8393\u5154\u5154.model3.json',
-  'full',
-);
+async function discoverAvatarParameterControls(avatar: AvatarManifest) {
+  const modelSettings = await fetchOptionalJson<ModelJsonPayload>(avatar.modelJson);
+  const displayInfoPath = modelSettings?.FileReferences?.DisplayInfo
+    ? resolveRelativeAsset(avatar.modelJson, modelSettings.FileReferences.DisplayInfo)
+    : null;
+  const vtubePath = createVtubeCandidatePath(avatar.modelJson);
 
-const strawberryBunnyTrialManifest = createStrawberryBunnyManifest(
-  strawberryTrialFolder,
-  'Trial asset pack with the public-safe expression subset.',
-  '\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json',
-  'trial',
-);
+  const [displayInfo, vtubeInfo] = await Promise.all([
+    displayInfoPath ? fetchOptionalJson<Cdi3Payload>(displayInfoPath) : Promise.resolve(null),
+    fetchOptionalJson<VtubePayload>(vtubePath),
+  ]);
 
-const bingtangManifest: AvatarManifest = {
-  id: 'bingtang',
-  name: '\u51b0\u7cd6',
-  summary: 'High-quality model by \u795e\u5bab\u51c9\u5b50 with strong blush, laugh, dark-face, and shocked-eye cues.',
+  const discovered = new Map<ParameterId, DiscoveredParameterInfo>();
+
+  for (const parameter of displayInfo?.Parameters ?? []) {
+    if (!parameter.Id) {
+      continue;
+    }
+
+    discovered.set(parameter.Id, {
+      id: parameter.Id,
+      name: parameter.Name,
+    });
+  }
+
+  for (const parameter of vtubeInfo?.ParameterSettings ?? []) {
+    if (!parameter.OutputLive2D) {
+      continue;
+    }
+
+    const existing = discovered.get(parameter.OutputLive2D);
+    discovered.set(parameter.OutputLive2D, {
+      id: parameter.OutputLive2D,
+      name: parameter.Name ?? existing?.name,
+      min: typeof parameter.OutputRangeLower === 'number' ? parameter.OutputRangeLower : existing?.min,
+      max: typeof parameter.OutputRangeUpper === 'number' ? parameter.OutputRangeUpper : existing?.max,
+    });
+  }
+
+  return genericParameterCatalog
+    .map((parameterConfig) => {
+      const parameterInfo = discovered.get(parameterConfig.id);
+      if (!parameterInfo) {
+        return null;
+      }
+
+      const { min, max } = normalizeDiscoveredRange(
+        parameterInfo.min,
+        parameterInfo.max,
+        parameterConfig.fallbackMin,
+        parameterConfig.fallbackMax,
+      );
+
+      return parameterControl(parameterConfig.id, parameterConfig.label, parameterConfig.prompt, min, max);
+    })
+    .filter((item): item is AvatarParameterControl => Boolean(item));
+}
+
+function getWatermarkFiles(avatar: AvatarManifest) {
+  return new Set(
+    avatar.watermark?.bindings
+      .filter((binding): binding is Extract<ExpressionBinding, { mode: 'file' }> => binding.mode === 'file')
+      .map((binding) => stripBaseUrl(binding.file)) ?? [],
+  );
+}
+
+function getExpressionAssetsForAvatar(avatar: AvatarManifest) {
+  const avatarDirectory = stripBaseUrl(getModelDirectory(avatar.modelJson)).replace(/\/+$/, '');
+
+  return Object.entries(expressionAssetModules)
+    .map(([sourcePath, assetUrl]) => ({
+      publicPath: sourcePath.replace(/^.*\/public\//, '').replace(/\\/g, '/'),
+      assetUrl,
+    }))
+    .filter((asset) => asset.publicPath.startsWith(`${avatarDirectory}/`));
+}
+
+async function discoverAvatarExpressions(avatar: AvatarManifest) {
+  const modelSettings = await fetchOptionalJson<ModelJsonPayload>(avatar.modelJson);
+  const watermarkFiles = getWatermarkFiles(avatar);
+  const expressionAssets = getExpressionAssetsForAvatar(avatar);
+
+  const referencedExpressions = (modelSettings?.FileReferences?.Expressions ?? [])
+    .filter((expressionItem) => expressionItem.File)
+    .map((expressionItem) => {
+      const publicPath = stripBaseUrl(resolveRelativeAsset(avatar.modelJson, expressionItem.File!));
+      const asset = expressionAssets.find((candidate) => candidate.publicPath === publicPath);
+
+      if (!asset) {
+        return null;
+      }
+
+      return {
+        name: expressionItem.Name?.trim() || normalizeExpressionFileName(publicPath.split('/').pop() ?? ''),
+        publicPath: asset.publicPath,
+        assetUrl: asset.assetUrl,
+      };
+    })
+    .filter((item): item is { name: string; publicPath: string; assetUrl: string } => Boolean(item));
+
+  const expressionSources = referencedExpressions.length > 0
+    ? referencedExpressions
+    : expressionAssets.map((asset) => ({
+        name: normalizeExpressionFileName(asset.publicPath.split('/').pop() ?? ''),
+        publicPath: asset.publicPath,
+        assetUrl: asset.assetUrl,
+      }));
+
+  const discoveredExpressions: AvatarExpression[] = [];
+  const seen = new Set<string>();
+
+  for (const expressionSource of expressionSources) {
+    if (watermarkFiles.has(expressionSource.publicPath)) {
+      continue;
+    }
+
+    const id = toExpressionId(expressionSource.name);
+    if (seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+    const label = toExpressionLabel(expressionSource.name);
+    const kind = inferExpressionKind(expressionSource.name);
+    discoveredExpressions.push({
+      id,
+      label,
+      kind,
+      prompt: createGenericExpressionPrompt(label, kind),
+      binding: {
+        mode: 'file',
+        file: expressionSource.assetUrl,
+      },
+      aliases: [],
+    });
+  }
+
+  const neutralExpression: AvatarExpression = {
+    id: 'neutral',
+    label: 'Neutral',
+    kind: 'emotion',
+    prompt: 'default calm face with no extra expression overlay',
+    binding: {
+      mode: 'preset',
+      params: {},
+    },
+    aliases: ['neutral', 'calm', 'normal', 'default'],
+  };
+
+  return [
+    neutralExpression,
+    ...discoveredExpressions,
+  ];
+}
+
+async function enrichAvatarManifest(avatar: AvatarManifest) {
+  const [expressions, parameterControls] = await Promise.all([
+    discoverAvatarExpressions(avatar),
+    discoverAvatarParameterControls(avatar),
+  ]);
+
+  return {
+    ...avatar,
+    expressions,
+    parameterControls,
+  } satisfies AvatarManifest;
+}
+
+const rabbitFolder = publicAsset('live2D/\u5154\u5b50\u6d1e');
+const ellenFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u827e\u83b2');
+const bingtangFolder = publicAsset('live2D/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6');
+const strawberryFolder = publicAsset('live2D/\u8349\u8393\u5154\u51541');
+const strawberryTrialFolder = publicAsset('live2D/\u8349\u8393\u5154\u5154 \u8bd5\u7528');
+const fuxuanFolder = publicAsset('live2D/\u7b26\u7384');
+const huohuoFolder = publicAsset('live2D/\u85ff\u85ff');
+
+const strawberryBunnyFullManifest = baseAvatar({
+  id: 'strawberryBunny',
+  name: '\u8349\u8393\u5154\u5154',
+  summary: 'Extended expression set. Uses the private full asset pack when it exists locally.',
   persona: {
-    tone: 'cool and polished with vtuber-stage confidence',
-    traits: ['sharp', 'confident', 'slightly teasing', 'camera-aware'],
+    tone: 'sweet, clingy, and soft',
+    traits: ['cute', 'warm', 'affectionate', 'playfully dependent'],
     styleRules: [
-      'Keep responses neat and lively.',
-      'Use a polished streamer-like cadence.',
-      'Allow a little teasing confidence, but do not sound mean.',
+      'Use soft and friendly wording.',
+      'Sound adorable rather than formal.',
+      'When happy, lean into sweetness and warmth.',
     ],
   },
-  modelJson: `${bingtangFolder}/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6.model3.json`,
-  scaleMultiplier: 0.3,
+  modelJson: `${strawberryFolder}/\u8349\u8393\u5154\u5154.model3.json`,
+  scaleMultiplier: 0.29,
   verticalOffset: 0.08,
-  modelTransform: createModelTransform(1, 0, 0),
-  transformDefaults: {
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0,
+  modelTransform: createModelTransform(0.98, 0, 0.01),
+  motions: {
+    idle: { file: `${strawberryFolder}/motion/Scene1.motion3.json` },
   },
-  expressions: [
-    expression(
-      'neutral',
-      'Neutral',
-      'default calm face with no explicit expression overlay',
-      {
-        mode: 'preset',
-        params: {
-          Paramlove2: 0,
-          Paramlove3: 0,
-          Paramlove4: 0,
-          Paramexpblack: 0,
-          Paraexpchouxiang: 0,
-          Paramexpeyeout: 0,
-        },
-      },
-      ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-    ),
-    expression(
-      'laugh',
-      'Laugh',
-      'bright happy laughing expression',
-      { mode: 'file', file: `${bingtangFolder}/hah.exp3.json` },
-      ['happy', 'laugh', 'smile', 'cheerful', '\u5f00\u5fc3', '\u7b11'],
-    ),
-    expression(
-      'blush',
-      'Blush',
-      'embarrassed blushing face',
-      { mode: 'file', file: `${bingtangFolder}/red.exp3.json` },
-      ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5bb3\u7f9e'],
-    ),
-    expression(
-      'angry',
-      'Angry',
-      'clearly angry expression',
-      { mode: 'file', file: `${bingtangFolder}/angery.exp3.json` },
-      ['angry', 'mad', 'annoyed', '\u751f\u6c14', '\u6124\u6012'],
-    ),
-    expression(
-      'dark_face',
-      'Dark Face',
-      'dark-faced upset or angry mood',
-      { mode: 'file', file: `${bingtangFolder}/black.exp3.json` },
-      ['dark', 'angry', 'annoyed', '\u9ed1\u8138', '\u751f\u6c14'],
-    ),
-    expression(
-      'wide_eyes',
-      'Wide Eyes',
-      'wide shocked eyes for surprise or speechlessness',
-      { mode: 'file', file: `${bingtangFolder}/O O.exp3.json` },
-      ['surprised', 'shocked', 'speechless', 'wide eyes', '\u60ca\u8bb6', '\u65e0\u8bed'],
-    ),
-  ],
   watermark: {
     enabledByDefault: false,
-    bindings: [
-      { mode: 'file', file: `${bingtangFolder}/shuiyin1.exp3.json` },
-      { mode: 'file', file: `${bingtangFolder}/shuiyin2.exp3.json` },
-    ],
+    bindings: [{ mode: 'file', file: `${strawberryFolder}/expressions/\u6c34\u5370.exp3.json` }],
   },
-};
+});
+
+const strawberryBunnyTrialManifest = baseAvatar({
+  id: 'strawberryBunny',
+  name: '\u8349\u8393\u5154\u5154',
+  summary: 'Trial asset pack with the public-safe expression subset.',
+  persona: strawberryBunnyFullManifest.persona,
+  modelJson: `${strawberryTrialFolder}/\u8349\u8393\u5154\u5154  \u8bd5\u7528.model3.json`,
+  scaleMultiplier: 0.29,
+  verticalOffset: 0.08,
+  modelTransform: createModelTransform(0.98, 0, 0.01),
+  motions: {
+    idle: { file: `${strawberryTrialFolder}/motion/Scene1.motion3.json` },
+  },
+  watermark: {
+    enabledByDefault: false,
+    bindings: [{ mode: 'file', file: `${strawberryTrialFolder}/expressions/\u6c34\u5370.exp3.json` }],
+  },
+});
 
 avatarResolvers.set('strawberryBunny', async () => (
   (await assetExists(strawberryBunnyFullManifest.modelJson))
@@ -462,10 +533,10 @@ avatarResolvers.set('strawberryBunny', async () => (
 ));
 
 export const avatars: Record<string, AvatarManifest> = {
-  yumi: {
+  yumi: baseAvatar({
     id: 'yumi',
     name: 'Yumi',
-    summary: 'Best expression coverage. Use it as the main semantic-to-expression reference model.',
+    summary: 'Primary reference avatar with a broad built-in expression pack.',
     persona: {
       tone: 'gentle, upbeat, and emotionally readable',
       traits: ['kind', 'bright', 'supportive', 'expressive'],
@@ -479,88 +550,15 @@ export const avatars: Record<string, AvatarManifest> = {
     scaleMultiplier: 0.27,
     verticalOffset: 0.08,
     modelTransform: createModelTransform(1, 0, 0),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face with no extra expression layers',
-        {
-          mode: 'preset',
-          params: { Paramheilian: 0, Paramheart: 0, Paramleiwangwang: 0, Paramxingxing: 0 },
-        },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-      expression(
-        'starry_eyes',
-        'Starry Eyes',
-        'bright delighted star eyes',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u661f\u661f\u773c.exp3.json') },
-        ['happy', 'excited', 'delighted', 'star', 'starry', '\u5f00\u5fc3', '\u6fc0\u52a8'],
-      ),
-      expression(
-        'teary_eyes',
-        'Teary Eyes',
-        'sad watery eyes close to crying',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u6cea\u6c6a\u6c6a.exp3.json') },
-        ['sad', 'cry', 'teary', 'upset', '\u96be\u8fc7', '\u60f3\u54ed'],
-      ),
-      expression(
-        'heart_eyes',
-        'Heart Eyes',
-        'adoring heart-shaped eyes',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u7231\u5fc3\u773c.exp3.json') },
-        ['love', 'adoring', 'crush', 'heart', 'shy', '\u559c\u6b22', '\u5fc3\u52a8'],
-      ),
-      expression(
-        'crooked_mouth',
-        'Crooked Mouth',
-        'skeptical or smug crooked-mouth expression',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u6b6a\u5634.exp3.json') },
-        ['suspicious', 'skeptical', 'doubtful', 'smug', '\u6000\u7591', '\u53ef\u7591'],
-      ),
-      expression(
-        'dizzy_eyes',
-        'Dizzy Eyes',
-        'spiral eyes for shock, dizziness, or dazed surprise',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u868a\u9999\u773c.exp3.json') },
-        ['surprised', 'dizzy', 'shocked', 'dazed', 'wow', '\u60ca\u8bb6', '\u6655'],
-      ),
-      expression(
-        'cat_mouth',
-        'Cat Mouth',
-        'playful teasing cat-mouth expression',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u732b\u732b\u5634.exp3.json') },
-        ['playful', 'teasing', 'mischievous', 'cat', '\u8c03\u76ae', '\u6076\u4f5c\u5267'],
-      ),
-      expression(
-        'tongue_out',
-        'Tongue Out',
-        'silly tongue-out teasing face',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u820c\u5934\u4f38\u51fa.exp3.json') },
-        ['tongue', 'silly', 'goofy', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
-      ),
-      expression(
-        'dark_face',
-        'Dark Face',
-        'dark-faced angry or intense mood',
-        { mode: 'file', file: publicAsset('live2D/yumi/\u9ed1\u8138.exp3.json') },
-        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
-      ),
-    ],
     motions: {
       wave: { file: publicAsset('live2D/yumi/wave.motion3.json') },
       tear: { file: publicAsset('live2D/yumi/tear.motion3.json') },
     },
-  },
-  ellen: {
+  }),
+  ellen: baseAvatar({
     id: 'ellen',
     name: 'Ellen',
-    summary: 'High-quality cat-girl model by 绁炲鑹瓙 with strong blush, shock, and playful accessory cues.',
+    summary: 'High-quality cat-girl model by 神宫凉子 with a broad built-in expression pack.',
     persona: {
       tone: 'lazy-cat teasing with a playful edge',
       traits: ['catlike', 'dryly playful', 'slightly smug', 'casually affectionate'],
@@ -574,65 +572,6 @@ export const avatars: Record<string, AvatarManifest> = {
     scaleMultiplier: 0.31,
     verticalOffset: 0.08,
     modelTransform: createModelTransform(1.06, 0, 0),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face with no extra decorative expressions',
-        {
-          mode: 'preset',
-          params: {
-            Paramlove8: 0,
-            Paramlove12: 0,
-            Paraexpmeiguihua2: 0,
-            Parammaoziexp50: 0,
-            Parammaoziexp55: 0,
-          },
-        },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-      expression(
-        'tongue_out',
-        'Tongue Out',
-        'playful tongue-out expression',
-        { mode: 'file', file: `${ellenFolder}/tang.exp3.json` },
-        ['playful', 'tongue', 'teasing', 'cheeky', '\u5410\u820c', '\u8c03\u76ae'],
-      ),
-      expression(
-        'dark_face',
-        'Dark Face',
-        'dark-faced angry mood',
-        { mode: 'file', file: `${ellenFolder}/black.exp3.json` },
-        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
-      ),
-      expression(
-        'shy_hand',
-        'Shy Hand',
-        'shy pose with clear affectionate restraint',
-        { mode: 'file', file: `${ellenFolder}/shou.exp3.json` },
-        ['shy', 'bashful', 'timid', '\u5bb3\u7f9e', '\u7f9e\u601d'],
-        'pose',
-      ),
-      expression(
-        'shock',
-        'Shock',
-        'clear shocked or startled reaction',
-        { mode: 'file', file: `${ellenFolder}/shock.exp3.json` },
-        ['surprised', 'shock', 'startled', 'wow', '\u60ca\u8bb6', '\u9707\u60ca'],
-      ),
-      expression(
-        'blush',
-        'Blush',
-        'embarrassed blushing face',
-        { mode: 'file', file: `${ellenFolder}/red.exp3.json` },
-        ['embarrassed', 'blush', 'flustered', '\u8138\u7ea2', '\u5c34\u5c2c'],
-      ),
-    ],
     motions: {
       idle: { file: `${ellenFolder}/idle.motion3.json` },
       idle2: { file: `${ellenFolder}/idle2.motion3.json` },
@@ -641,10 +580,34 @@ export const avatars: Record<string, AvatarManifest> = {
       enabledByDefault: false,
       bindings: [{ mode: 'file', file: `${ellenFolder}/shuiyin.exp3.json` }],
     },
-  },
-  bingtang: bingtangManifest,
+  }),
+  bingtang: baseAvatar({
+    id: 'bingtang',
+    name: '\u51b0\u7cd6',
+    summary: 'High-quality model by 神宫凉子 with a strong built-in expression set.',
+    persona: {
+      tone: 'cool and polished with vtuber-stage confidence',
+      traits: ['sharp', 'confident', 'slightly teasing', 'camera-aware'],
+      styleRules: [
+        'Keep responses neat and lively.',
+        'Use a polished streamer-like cadence.',
+        'Allow a little teasing confidence, but do not sound mean.',
+      ],
+    },
+    modelJson: `${bingtangFolder}/\u514d\u8d39\u6a21\u578b\u51b0\u7cd6.model3.json`,
+    scaleMultiplier: 0.3,
+    verticalOffset: 0.08,
+    modelTransform: createModelTransform(1, 0, 0),
+    watermark: {
+      enabledByDefault: false,
+      bindings: [
+        { mode: 'file', file: `${bingtangFolder}/shuiyin1.exp3.json` },
+        { mode: 'file', file: `${bingtangFolder}/shuiyin2.exp3.json` },
+      ],
+    },
+  }),
   strawberryBunny: strawberryBunnyFullManifest,
-  rabbitHole: {
+  rabbitHole: baseAvatar({
     id: 'rabbitHole',
     name: 'Rabbit Hole',
     summary: 'Great for exaggerated cues such as smug, disdainful, dizzy, and wink-like states.',
@@ -657,78 +620,15 @@ export const avatars: Record<string, AvatarManifest> = {
         'Keep the energy lively and slightly unhinged, but still readable.',
       ],
     },
-    modelJson: rabbitModel,
+    modelJson: `${rabbitFolder}/\u5154\u5b50\u6d1eldd.model3.json`,
     scaleMultiplier: 0.54,
     verticalOffset: 0.12,
     modelTransform: createModelTransform(0.9, 0, 0.02),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face without added expression files',
-        { mode: 'preset', params: { ParamCheek: 0, ParamMouthForm: 0, ParamMouthX: 0 } },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-      expression(
-        'smile',
-        'Smile',
-        'clear smiling expression',
-        { mode: 'file', file: `${rabbitMotion}/\u7b11.exp3.json` },
-        ['happy', 'smile', 'cheerful', '\u5f00\u5fc3', '\u7b11'],
-      ),
-      expression(
-        'sweat',
-        'Sweat',
-        'sweaty anxious or awkward face',
-        { mode: 'file', file: `${rabbitMotion}/\u6d41\u6c57.exp3.json` },
-        ['awkward', 'nervous', 'sweat', 'anxious', '\u7d27\u5f20', '\u6d41\u6c57'],
-      ),
-      expression(
-        'disgust',
-        'Disgust',
-        'disdainful or annoyed expression',
-        { mode: 'file', file: `${rabbitMotion}/\u5acc\u5f03.exp3.json` },
-        ['angry', 'disgust', 'disdain', 'annoyed', '\u5acc\u5f03', '\u538c\u70e6'],
-      ),
-      expression(
-        'wink',
-        'Wink',
-        'playful wink',
-        { mode: 'file', file: `${rabbitMotion}/wink.exp3.json` },
-        ['wink', 'playful', 'teasing', '\u7728\u773c', '\u8c03\u76ae'],
-      ),
-      expression(
-        'dizzy',
-        'Dizzy',
-        'dizzy or overwhelmed expression',
-        { mode: 'file', file: `${rabbitMotion}/\u6655\u6655.exp3.json` },
-        ['dizzy', 'dazed', 'overwhelmed', 'surprised', '\u6655', '\u61f5'],
-      ),
-      expression(
-        'smirk',
-        'Smirk',
-        'mischievous smug grin',
-        { mode: 'file', file: `${rabbitMotion}/\u574f\u7b11.exp3.json` },
-        ['smug', 'smirk', 'mischievous', 'playful', '\u574f\u7b11', '\u5f97\u610f'],
-      ),
-      expression(
-        'tongue_cry',
-        'Tongue Cry',
-        'crying face with tongue out',
-        { mode: 'file', file: `${rabbitMotion}/\u5410\u820c\u54ed\u54ed.exp3.json` },
-        ['cry', 'sad', 'tongue', 'messy', '\u54ed', '\u5410\u820c'],
-      ),
-    ],
-  },
-  fuxuan: {
+  }),
+  fuxuan: baseAvatar({
     id: 'fuxuan',
     name: 'Fu Xuan',
-    summary: 'This model currently has no curated exp3 expression set, so only the neutral state is exposed.',
+    summary: 'Expression and parameter metadata now come directly from the model assets.',
     persona: {
       tone: 'calm, precise, and dignified',
       traits: ['composed', 'intelligent', 'reserved', 'authoritative'],
@@ -742,39 +642,11 @@ export const avatars: Record<string, AvatarManifest> = {
     scaleMultiplier: 0.28,
     verticalOffset: 0.07,
     modelTransform: createModelTransform(1, 0, 0),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face only',
-        {
-          mode: 'preset',
-          params: {
-            Param101: 0,
-            Param104: 0,
-            Param109: 0,
-            Param130: 0,
-            ParamEyeLSmile: 0,
-            ParamEyeRSmile: 0,
-            ParamMouthForm: 0,
-            ParamMouthOpenY: 0,
-            ParamBrowLForm: 0,
-            ParamBrowRForm: 0,
-          },
-        },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-    ],
-  },
-  huohuo: {
+  }),
+  huohuo: baseAvatar({
     id: 'huohuo',
     name: 'Huo Huo',
-    summary: 'Mixed exp and motion assets. Only explicit, curated expression files are exposed here.',
+    summary: 'Mixed exp and motion assets discovered directly from the model folder.',
     persona: {
       tone: 'timid, gentle, and easily flustered',
       traits: ['nervous', 'soft', 'earnest', 'easily startled'],
@@ -788,62 +660,11 @@ export const avatars: Record<string, AvatarManifest> = {
     scaleMultiplier: 0.22,
     verticalOffset: 0.06,
     modelTransform: createModelTransform(1.05, 0, 0),
-    transformDefaults: {
-      scale: 1,
-      offsetX: 0,
-      offsetY: 0,
-    },
-    expressions: [
-      expression(
-        'neutral',
-        'Neutral',
-        'default calm face with no explicit exp3 overlays',
-        { mode: 'preset', params: { Param107: 0, Param108: 0, ParamCheek: 0 } },
-        ['neutral', 'calm', 'normal', 'default', '\u5e73\u9759', '\u666e\u901a'],
-      ),
-      expression(
-        'tears',
-        'Tears',
-        'sad crying expression with visible tears',
-        { mode: 'file', file: `${huohuoFolder}/\u773c\u6cea.exp3.json` },
-        ['sad', 'cry', 'tears', 'upset', '\u54ed', '\u773c\u6cea'],
-      ),
-      expression(
-        'dark_face',
-        'Dark Face',
-        'dark-faced angry mood',
-        { mode: 'file', file: `${huohuoFolder}/\u9ed1\u8138.exp3.json` },
-        ['angry', 'mad', 'annoyed', 'dark', '\u751f\u6c14', '\u9ed1\u8138'],
-      ),
-      expression(
-        'white_eyes',
-        'White Eyes',
-        'rolled or whitened eyes for shock or exasperation',
-        { mode: 'file', file: `${huohuoFolder}/\u767d\u773c.exp3.json` },
-        ['surprised', 'shocked', 'speechless', 'white eyes', '\u767d\u773c', '\u65e0\u8bed'],
-      ),
-      expression(
-        'flag',
-        'Flag',
-        'playful pose with a flag accessory',
-        { mode: 'file', file: `${huohuoFolder}/\u62ff\u65d7\u5b50.exp3.json` },
-        ['playful', 'flag', 'cheer', 'cute', '\u8c03\u76ae', '\u62ff\u65d7\u5b50'],
-        'prop',
-      ),
-      expression(
-        'pillow',
-        'Pillow',
-        'soft cozy pose holding a pillow',
-        { mode: 'file', file: `${huohuoFolder}/\u62b1\u6795.exp3.json` },
-        ['sleepy', 'cozy', 'soft', 'pillow', '\u56f0', '\u62b1\u6795'],
-        'prop',
-      ),
-    ],
     motions: {
       lively: { file: `${huohuoFolder}/haoqi.motion3.json` },
       sleepy: { file: `${huohuoFolder}/keshui.motion3.json` },
     },
-  },
+  }),
 };
 
 export const featuredAvatarIds = ['yumi', 'strawberryBunny', 'bingtang', 'ellen'] as const;
@@ -863,7 +684,7 @@ export async function resolveAvatarManifest(avatar: AvatarManifest) {
   }
 
   const resolver = avatarResolvers.get(avatar.id);
-  const resolution = Promise.resolve(resolver ? resolver() : avatar);
+  const resolution = Promise.resolve(resolver ? resolver() : avatar).then(enrichAvatarManifest);
   avatarResolutionCache.set(avatar.id, resolution);
   return resolution;
 }
