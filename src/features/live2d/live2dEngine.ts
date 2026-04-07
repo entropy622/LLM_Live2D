@@ -5,6 +5,7 @@ import type {
   AvatarExpression,
   ExpressionBinding,
   ExpressionLayer,
+  ParameterOverride,
 } from './avatarManifest.ts';
 
 declare global {
@@ -26,6 +27,7 @@ type RuntimeState = {
   currentTransform: StageTransform;
   resolvedBindingCache: Map<string, ResolvedBinding>;
   expressionMix: ExpressionLayer[];
+  parameterOverrides: ParameterOverride[];
   watermarkVisible: boolean;
 };
 
@@ -232,6 +234,7 @@ async function buildMixedParameters(
   runtime: RuntimeState,
   avatar: AvatarManifest,
   expressionMix: ExpressionLayer[],
+  parameterOverrides: ParameterOverride[],
   watermarkVisible: boolean,
 ) {
   const nextParams = new Map<string, number>();
@@ -252,6 +255,11 @@ async function buildMixedParameters(
     for (const binding of avatar.watermark.bindings) {
       await mergeBindingIntoParameters(runtime, nextParams, binding, 1);
     }
+  }
+
+  for (const parameterOverride of parameterOverrides) {
+    ensureTrackedBaseline(runtime, parameterOverride.id);
+    nextParams.set(parameterOverride.id, parameterOverride.value);
   }
 
   return nextParams;
@@ -325,6 +333,7 @@ export async function createLive2DRuntime(
     currentTransform: avatar.transformDefaults,
     resolvedBindingCache: new Map(),
     expressionMix: [],
+    parameterOverrides: [],
     watermarkVisible: avatar.watermark?.enabledByDefault ?? false,
   };
 
@@ -363,10 +372,23 @@ export async function setWatermarkVisibility(
   await applyRuntimeState(runtime, avatar);
 }
 
+export async function setParameterOverrides(
+  runtime: RuntimeState,
+  avatar: AvatarManifest,
+  parameterOverrides: ParameterOverride[],
+) {
+  runtime.parameterOverrides = parameterOverrides;
+  await applyRuntimeState(runtime, avatar);
+}
+
 async function applyRuntimeState(runtime: RuntimeState, avatar: AvatarManifest) {
   runtime.model.internalModel.motionManager.expressionManager?.resetExpression();
 
-  if (runtime.expressionMix.length === 0 && !(runtime.watermarkVisible && avatar.watermark)) {
+  if (
+    runtime.expressionMix.length === 0
+    && runtime.parameterOverrides.length === 0
+    && !(runtime.watermarkVisible && avatar.watermark)
+  ) {
     runtime.activeParams = null;
     applyBaseline(runtime);
     return;
@@ -376,6 +398,7 @@ async function applyRuntimeState(runtime: RuntimeState, avatar: AvatarManifest) 
     runtime,
     avatar,
     runtime.expressionMix,
+    runtime.parameterOverrides,
     runtime.watermarkVisible,
   );
 

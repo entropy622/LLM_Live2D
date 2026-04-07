@@ -9,6 +9,7 @@ import {
   resolveAvatarManifestById,
   type AvatarManifest,
   type ExpressionLayer,
+  type ParameterOverride,
 } from './features/live2d/avatarManifest.ts';
 import {
   createAssistantResponse,
@@ -67,6 +68,7 @@ export default function App() {
   const [activeExpressionMix, setActiveExpressionMix] = useState<ExpressionLayer[]>(
     createNeutralMix(defaultAvatarId),
   );
+  const [activeParameterOverrides, setActiveParameterOverrides] = useState<ParameterOverride[]>([]);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [watermarkVisible, setWatermarkVisible] = useState(
@@ -101,6 +103,7 @@ export default function App() {
       setStageTransform(resolvedAvatar.transformDefaults);
       setWatermarkVisible(resolvedAvatar.watermark?.enabledByDefault ?? false);
       setActiveExpressionMix([{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }]);
+      setActiveParameterOverrides([]);
 
       if (!hasResolvedInitialAvatar.current) {
         hasResolvedInitialAvatar.current = true;
@@ -151,6 +154,7 @@ export default function App() {
       });
 
       setActiveExpressionMix(response.expressionMix);
+      setActiveParameterOverrides(response.parameterOverrides);
       setMessages((current) => [
         ...current,
         {
@@ -159,6 +163,7 @@ export default function App() {
           content: response.reply,
           expression: response.expression,
           expressionMix: response.expressionMix,
+          parameterOverrides: response.parameterOverrides,
           meta: response.source,
         },
       ]);
@@ -266,6 +271,7 @@ export default function App() {
         <Live2DStage
           avatar={selectedAvatar}
           expressionMix={activeExpressionMix}
+          parameterOverrides={activeParameterOverrides}
           watermarkVisible={!watermarkVisible}
           transform={stageTransform}
           onTransformChange={setStageTransform}

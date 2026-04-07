@@ -28,6 +28,21 @@ export type AvatarExpression = {
   aliases?: string[];
 };
 
+export type ParameterId = string;
+
+export type ParameterOverride = {
+  id: ParameterId;
+  value: number;
+};
+
+export type AvatarParameterControl = {
+  id: ParameterId;
+  label: string;
+  prompt: string;
+  min: number;
+  max: number;
+};
+
 export type MotionBinding = {
   file: string;
   group?: string;
@@ -61,6 +76,7 @@ export type AvatarManifest = {
     offsetY: number;
   };
   expressions: AvatarExpression[];
+  parameterControls?: AvatarParameterControl[];
   motions?: Record<string, MotionBinding>;
   watermark?: WatermarkBinding;
 };
@@ -94,6 +110,22 @@ function expression(
     prompt,
     binding,
     aliases,
+  };
+}
+
+function parameterControl(
+  id: ParameterId,
+  label: string,
+  prompt: string,
+  min: number,
+  max: number,
+): AvatarParameterControl {
+  return {
+    id,
+    label,
+    prompt,
+    min,
+    max,
   };
 }
 
@@ -274,6 +306,22 @@ function createStrawberryBunnyManifest(
     );
   }
 
+  const parameterControls = expressionSet === 'full'
+    ? [
+        parameterControl('ParamAngleX', 'Head Turn X', 'turn head left or right', -30, 30),
+        parameterControl('ParamAngleY', 'Head Tilt Y', 'tilt head up or down', -30, 30),
+        parameterControl('ParamAngleZ', 'Head Roll Z', 'roll head sideways', -30, 30),
+        parameterControl('ParamBodyAngleX', 'Body Turn X', 'rotate upper body left or right', -10, 10),
+        parameterControl('ParamEyeBallX', 'Eye Look X', 'shift gaze left or right', -1, 1),
+        parameterControl('ParamEyeBallY', 'Eye Look Y', 'shift gaze up or down', -1, 1),
+        parameterControl('ParamBrowLY', 'Left Brow Y', 'raise or lower the left eyebrow', -1, 1),
+        parameterControl('ParamBrowRY', 'Right Brow Y', 'raise or lower the right eyebrow', -1, 1),
+        parameterControl('ParamMouthOpenY', 'Mouth Open', 'open the mouth vertically', 0, 1),
+        parameterControl('ParamMouthForm', 'Mouth Form', 'shape the mouth toward smile or pout', -1, 1),
+        parameterControl('ParamCheek', 'Cheek Flush', 'increase cheek blush intensity', 0, 1),
+      ]
+    : undefined;
+
   return {
     id: 'strawberryBunny',
     name: '\u8349\u8393\u5154\u5154',
@@ -297,6 +345,7 @@ function createStrawberryBunnyManifest(
       offsetY: 0,
     },
     expressions,
+    parameterControls,
     motions: {
       idle: { file: `${folder}/motion/Scene1.motion3.json` },
     },
@@ -843,4 +892,8 @@ export function getAvatarNeutralExpressionId(avatar: AvatarManifest) {
 
 export function hasAvatarExpression(avatar: AvatarManifest, expressionId: ExpressionId) {
   return avatar.expressions.some((expressionItem) => expressionItem.id === expressionId);
+}
+
+export function getAvatarParameterControl(avatar: AvatarManifest, parameterId: ParameterId) {
+  return avatar.parameterControls?.find((parameterControlItem) => parameterControlItem.id === parameterId);
 }

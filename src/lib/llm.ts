@@ -2,10 +2,12 @@ import type {
   AvatarManifest,
   ExpressionId,
   ExpressionLayer,
+  ParameterOverride,
 } from '../features/live2d/avatarManifest.ts';
 import {
   getAvatarExpression,
   getAvatarNeutralExpressionId,
+  getAvatarParameterControl,
   hasAvatarExpression,
 } from '../features/live2d/avatarManifest.ts';
 
@@ -15,6 +17,7 @@ export type ChatMessage = {
   content: string;
   expression?: ExpressionId;
   expressionMix?: ExpressionLayer[];
+  parameterOverrides?: ParameterOverride[];
   meta?: string;
 };
 
@@ -22,6 +25,7 @@ export type AssistantResponse = {
   reply: string;
   expression: ExpressionId;
   expressionMix: ExpressionLayer[];
+  parameterOverrides: ParameterOverride[];
   intensity: number;
   durationMs: number;
   source: 'remote';
@@ -48,6 +52,13 @@ type RawExpressionLayer = {
   expression?: string;
   key?: string;
   weight?: number;
+};
+
+type RawParameterOverride = {
+  id?: string;
+  key?: string;
+  parameter?: string;
+  value?: number;
 };
 
 const llmSettingsStorageKey = 'llm-live2d:llm-settings';
@@ -136,10 +147,48 @@ function parseAssistantPayload(raw: string) {
   try {
     return JSON.parse(jsonCandidate) as Partial<AssistantResponse> & {
       expressionMix?: RawExpressionLayer[];
+      parameterOverrides?: RawParameterOverride[];
     };
   } catch {
     return null;
   }
+}
+
+function clampParameterValue(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function normalizeParameterOverrides(
+  avatar: AvatarManifest,
+  rawOverrides: RawParameterOverride[] | ParameterOverride[] | undefined,
+) {
+  const normalized = new Map<string, number>();
+
+  for (const rawOverride of rawOverrides ?? []) {
+    const parameterId =
+      ('parameter' in rawOverride ? rawOverride.parameter : undefined)
+      ?? rawOverride.id
+      ?? ('key' in rawOverride ? rawOverride.key : undefined);
+
+    if (!parameterId || typeof rawOverride.value !== 'number') {
+      continue;
+    }
+
+    const parameterControl = getAvatarParameterControl(avatar, parameterId);
+    if (!parameterControl) {
+      continue;
+    }
+
+    normalized.set(
+      parameterId,
+      clampParameterValue(rawOverride.value, parameterControl.min, parameterControl.max),
+    );
+  }
+
+  return [...normalized.entries()].map(([id, value]) => ({
+    id,
+    value,
+  }));
 }
 
 export function normalizeExpressionMix(
@@ -350,11 +399,13 @@ async function requestRemoteAssistant({
     parsed.expressionMix,
     parsed.expression ?? getAvatarNeutralExpressionId(avatar),
   );
+  const parameterOverrides = normalizeParameterOverrides(avatar, parsed.parameterOverrides);
 
   return {
     reply: stripAvatarStateMarkers(parsed.reply ?? '...'),
     expression: getPrimaryExpression(avatar, expressionMix),
     expressionMix,
+    parameterOverrides,
     intensity: parsed.intensity ?? 0.65,
     durationMs: parsed.durationMs ?? 2800,
     source: 'remote',
@@ -368,6 +419,12 @@ export function createSystemPrompt(avatar: AvatarManifest) {
         `- id: "${expressionItem.id}", kind: "${expressionItem.kind}", label: "${expressionItem.label}", meaning: "${expressionItem.prompt}"`,
     )
     .join('\n');
+  const availableParameters = avatar.parameterControls
+    ?.map(
+      (parameterControl) =>
+        `- id: "${parameterControl.id}", label: "${parameterControl.label}", range: [${parameterControl.min}, ${parameterControl.max}], meaning: "${parameterControl.prompt}"`,
+    )
+    .join('\n');
   const personaTraits = avatar.persona.traits.join(', ');
   const personaRules = avatar.persona.styleRules.map((rule) => `- ${rule}`).join('\n');
 
@@ -379,6 +436,18 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     personaRules,
     'Only use expressions from this exact catalog:',
     available,
+    ...(availableParameters
+      ? [
+          'You may also apply direct parameter overrides from this exact whitelist when subtle face or pose tuning is needed:',
+          availableParameters,
+          'Use direct parameter overrides sparingly. Prefer expressionMix for coarse emotion, and use parameterOverrides only for small refinements.',
+          'Only emit parameter ids from the whitelist. Never invent parameter ids.',
+          'parameterOverrides must be an array of objects like {"id":"ParamMouthOpenY","value":0.35}.',
+          'Keep parameterOverrides short. Use at most four items.',
+        ]
+      : [
+          'parameterOverrides must be an empty array because this avatar has no direct parameter whitelist.',
+        ]),
     'Treat kind="emotion" as mood layers.',
     'Treat kind="pose", kind="prop", and kind="effect" as scene layers rather than pure emotions.',
     'If the system provides an [avatar_state ...] control marker, preserve relevant ongoing pose/prop/effect layers unless the new turn clearly ends or replaces that activity.',
@@ -389,17 +458,18 @@ export function createSystemPrompt(avatar: AvatarManifest) {
     'Choose one to three expressions and blend them only when the mood or scene is mixed.',
     'Do not invent unsupported emotions or ids.',
     'Return strict JSON only. Do not return plain text. Do not return markdown.',
-    'The response must be a single JSON object with exactly these top-level keys: reply, expression, expressionMix, intensity, durationMs.',
+    'The response must be a single JSON object with exactly these top-level keys: reply, expression, expressionMix, parameterOverrides, intensity, durationMs.',
     'expression must be one valid catalog id.',
     'expressionMix must be an array of objects like {"expression":"starry_eyes","weight":0.72}.',
     'Weights must be between 0 and 1.',
     'Sort expressionMix from strongest to weakest.',
     'If one expression is clearly dominant, it may still be the only item in the array.',
+    'parameterOverrides must always be present as an array, even if it is empty.',
     'reply must be the user-visible natural language response string.',
     'intensity must be a number between 0 and 1.',
     'durationMs must be an integer number of milliseconds.',
     'Example JSON:',
-    '{"reply":"Sounds good, let us play together.","expression":"gaming","expressionMix":[{"expression":"gaming","weight":1},{"expression":"starry_eyes","weight":0.8}],"intensity":0.9,"durationMs":3000}',
+    '{"reply":"Sounds good, let us play together.","expression":"gaming","expressionMix":[{"expression":"gaming","weight":1},{"expression":"starry_eyes","weight":0.8}],"parameterOverrides":[{"id":"ParamMouthOpenY","value":0.32},{"id":"ParamEyeBallX","value":0.18}],"intensity":0.9,"durationMs":3000}',
   ].join('\n');
 }
 
