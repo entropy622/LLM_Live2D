@@ -4,6 +4,9 @@
 
 体验地址：`https://entropy622.github.io/LLM_Live2D/`
 
+<img width="2559" height="1353" alt="image" src="https://github.com/user-attachments/assets/7e294840-e27d-4886-92ec-4663e7564ce7" />
+
+
 ## 背景
 
 本项目受到 `Neuro Sama` 启发。
