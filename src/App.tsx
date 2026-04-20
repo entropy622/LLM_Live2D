@@ -21,6 +21,14 @@ import {
   type LlmSettings,
   type ChatMessage,
 } from './lib/llm.ts';
+import {
+  getDefaultTtsSettings,
+  loadStoredTtsSettings,
+  saveStoredTtsSettings,
+  speakText,
+  stopSpeaking,
+  type TtsSettings,
+} from './lib/tts.ts';
 import type { StageTransform } from './features/live2d/live2dEngine.ts';
 
 const repositoryUrl = 'https://github.com/entropy622/LLM_Live2D';
@@ -54,6 +62,9 @@ export default function App() {
   );
   const [activeParameterOverrides, setActiveParameterOverrides] = useState<ParameterOverride[]>([]);
   const [llmSettings, setLlmSettings] = useState<LlmSettings>(getDefaultLlmSettings());
+  const [ttsSettings, setTtsSettings] = useState<TtsSettings>(getDefaultTtsSettings());
+  const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [mouthOpen, setMouthOpen] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [controlDrawerOpen, setControlDrawerOpen] = useState(false);
   const [watermarkVisible, setWatermarkVisible] = useState(
@@ -71,9 +82,44 @@ export default function App() {
     () => new Map(activeParameterOverrides.map((parameterOverride) => [parameterOverride.id, parameterOverride.value])),
     [activeParameterOverrides],
   );
+  const stageParameterOverrides = useMemo(() => {
+    if (mouthOpen <= 0.01) {
+      return activeParameterOverrides;
+    }
+
+    return [
+      ...activeParameterOverrides.filter((parameterOverride) => parameterOverride.id !== 'ParamMouthOpenY'),
+      {
+        id: 'ParamMouthOpenY',
+        value: mouthOpen,
+      },
+    ];
+  }, [activeParameterOverrides, mouthOpen]);
 
   useEffect(() => {
     setLlmSettings(loadStoredLlmSettings());
+    setTtsSettings(loadStoredTtsSettings());
+  }, []);
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) {
+      return undefined;
+    }
+
+    function syncVoices() {
+      setBrowserVoices(window.speechSynthesis.getVoices());
+    }
+
+    syncVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', syncVoices);
+
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', syncVoices);
+    };
+  }, []);
+
+  useEffect(() => () => {
+    stopSpeaking();
   }, []);
 
   useEffect(() => {
@@ -93,6 +139,8 @@ export default function App() {
       setWatermarkVisible(resolvedAvatar.watermark?.enabledByDefault ?? false);
       setActiveExpressionMix([{ key: getAvatarNeutralExpressionId(resolvedAvatar), weight: 1 }]);
       setActiveParameterOverrides([]);
+      setMouthOpen(0);
+      stopSpeaking();
       setControlDrawerOpen(false);
 
       if (!hasResolvedInitialAvatar.current) {
@@ -145,6 +193,14 @@ export default function App() {
 
       setActiveExpressionMix(response.expressionMix);
       setActiveParameterOverrides(response.parameterOverrides);
+      void speakText({
+        text: response.reply,
+        settings: ttsSettings,
+        onMouthChange: setMouthOpen,
+      }).catch((error) => {
+        console.error(error);
+        setMouthOpen(0);
+      });
       setMessages((current) => [
         ...current,
         {
@@ -210,8 +266,17 @@ export default function App() {
     }));
   }
 
+  function updateTtsSettings(patch: Partial<TtsSettings>) {
+    setTtsSettings((current) => ({
+      ...current,
+      ...patch,
+    }));
+  }
+
   function handleSaveLlmSettings() {
     saveStoredLlmSettings(llmSettings);
+    saveStoredTtsSettings(ttsSettings);
+    setSettingsOpen(false);
   }
 
   function handleCloseSettings() {
@@ -274,7 +339,7 @@ export default function App() {
         <Live2DStage
           avatar={selectedAvatar}
           expressionMix={activeExpressionMix}
-          parameterOverrides={activeParameterOverrides}
+          parameterOverrides={stageParameterOverrides}
           watermarkVisible={!watermarkVisible}
           transform={stageTransform}
           onTransformChange={setStageTransform}
@@ -352,7 +417,7 @@ export default function App() {
               <span>Model Controls</span>
               <span className="control-drawer-toggle-meta">
                 {visibleExpressions.length} expressions
-                {activeParameterOverrides.length ? ` · ${activeParameterOverrides.length} params` : ''}
+                {stageParameterOverrides.length ? ` · ${stageParameterOverrides.length} params` : ''}
               </span>
             </button>
             {controlDrawerOpen ? (
@@ -375,7 +440,9 @@ export default function App() {
                   <div className="chip-row">
                     {(selectedAvatar.parameterControls?.length ?? 0) > 0 ? (
                       selectedAvatar.parameterControls!.map((parameterControl) => {
-                        const activeValue = activeParameterMap.get(parameterControl.id);
+                        const activeValue = parameterControl.id === 'ParamMouthOpenY' && mouthOpen > 0.01
+                          ? mouthOpen
+                          : activeParameterMap.get(parameterControl.id);
                         return (
                           <span
                             key={parameterControl.id}
@@ -443,7 +510,7 @@ export default function App() {
       </section>
 
       {settingsOpen ? (
-        <div className="settings-modal-backdrop" onClick={handleCloseSettings}>
+        <div className="settings-modal-backdrop">
           <section
             className="settings-modal"
             onClick={(event) => event.stopPropagation()}
@@ -487,6 +554,81 @@ export default function App() {
                   placeholder="sk-..."
                 />
               </label>
+            </div>
+
+            <div className="settings-section">
+              <div>
+                <p className="eyebrow">Voice</p>
+                <h3>TTS Settings</h3>
+              </div>
+              <div className="settings-grid">
+                <label className="field">
+                  <span>Provider</span>
+                  <select
+                    value={ttsSettings.provider}
+                    onChange={(event) => updateTtsSettings({ provider: event.target.value as TtsSettings['provider'] })}
+                  >
+                    <option value="browser">Browser / System Voice</option>
+                    <option value="api">TTS API</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Browser Voice</span>
+                  <select
+                    value={ttsSettings.browserVoice}
+                    onChange={(event) => updateTtsSettings({ browserVoice: event.target.value })}
+                    disabled={ttsSettings.provider !== 'browser'}
+                  >
+                    <option value="">Default voice</option>
+                    {browserVoices.map((voice) => (
+                      <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                        {voice.name} · {voice.lang}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>TTS API URL</span>
+                  <input
+                    type="text"
+                    value={ttsSettings.apiUrl}
+                    onChange={(event) => updateTtsSettings({ apiUrl: event.target.value })}
+                    placeholder="https://.../audio/speech"
+                    disabled={ttsSettings.provider !== 'api'}
+                  />
+                </label>
+                <label className="field">
+                  <span>TTS Model</span>
+                  <input
+                    type="text"
+                    value={ttsSettings.apiModel}
+                    onChange={(event) => updateTtsSettings({ apiModel: event.target.value })}
+                    placeholder="tts-1"
+                    disabled={ttsSettings.provider !== 'api'}
+                  />
+                </label>
+                <label className="field">
+                  <span>TTS Voice</span>
+                  <input
+                    type="text"
+                    value={ttsSettings.apiVoice}
+                    onChange={(event) => updateTtsSettings({ apiVoice: event.target.value })}
+                    placeholder="alloy"
+                    disabled={ttsSettings.provider !== 'api'}
+                  />
+                </label>
+                <label className="field">
+                  <span>TTS API Key</span>
+                  <input
+                    type="password"
+                    value={ttsSettings.apiKey}
+                    onChange={(event) => updateTtsSettings({ apiKey: event.target.value })}
+                    placeholder="sk-..."
+                    disabled={ttsSettings.provider !== 'api'}
+                  />
+                </label>
+              </div>
             </div>
 
             <div className="settings-actions">

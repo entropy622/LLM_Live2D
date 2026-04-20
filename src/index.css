@@ -164,6 +164,12 @@ button {
   outline: none;
 }
 
+.field select:disabled,
+.field input:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .field select {
   appearance: none;
   -webkit-appearance: none;
@@ -472,6 +478,17 @@ button {
   gap: 12px;
 }
 
+.settings-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.settings-section h3 {
+  margin: 4px 0 0;
+  font-size: 1.1rem;
+}
+
 .settings-key-field {
   grid-column: 1 / -1;
 }
@@ -495,6 +512,8 @@ button {
 
 .settings-modal {
   width: min(680px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  overflow: auto;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(17, 19, 25, 0.98));
