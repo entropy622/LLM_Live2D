@@ -313,6 +313,10 @@ async function fetchRemoteCompletion(
   messages: RemoteMessage[],
   temperature: number,
 ) {
+  const normalizedModel = model.trim().toLowerCase();
+  const shouldDisableThinking = normalizedModel.startsWith('qwen')
+    && !normalizedModel.includes('thinking');
+
   const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
@@ -326,6 +330,14 @@ async function fetchRemoteCompletion(
       response_format: {
         type: 'json_object',
       },
+      ...(shouldDisableThinking
+        ? {
+            enable_thinking: false,
+            extra_body: {
+              enable_thinking: false,
+            },
+          }
+        : {}),
       messages,
     }),
   });

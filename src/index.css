@@ -493,6 +493,10 @@ button {
   grid-column: 1 / -1;
 }
 
+.settings-wide-field {
+  grid-column: 1 / -1;
+}
+
 .settings-actions {
   display: flex;
   justify-content: flex-end;

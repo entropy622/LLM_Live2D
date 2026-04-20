@@ -1,4 +1,4 @@
-export type TtsProvider = 'off' | 'browser' | 'api';
+export type TtsProvider = 'off' | 'browser' | 'qwen' | 'api';
 
 export type TtsSettings = {
   provider: TtsProvider;
@@ -7,12 +7,25 @@ export type TtsSettings = {
   apiKey: string;
   apiModel: string;
   apiVoice: string;
+  apiInstructions: string;
 };
 
 type SpeakArgs = {
   text: string;
   settings: TtsSettings;
+  fallbackApiKey?: string;
   onMouthChange: (value: number) => void;
+};
+
+type QwenTtsResponse = {
+  output?: {
+    audio?: {
+      url?: string;
+    };
+  };
+  code?: string;
+  message?: string;
+  request_id?: string;
 };
 
 type SpeechSynthesisWithOptionalPending = SpeechSynthesis & {
@@ -20,6 +33,11 @@ type SpeechSynthesisWithOptionalPending = SpeechSynthesis & {
 };
 
 const ttsSettingsStorageKey = 'llm-live2d:tts-settings';
+const directQwenTtsApiUrl = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+export const defaultQwenTtsApiUrl = '/dashscope/api/v1/services/aigc/multimodal-generation/generation';
+export const defaultQwenTtsModel = 'qwen3-tts-instruct-flash';
+export const defaultQwenTtsVoice = 'Bunny';
+export const defaultQwenTtsInstructions = 'Use a bright, sweet, lively, cute anime-style voice with natural conversational delivery.';
 
 let activeSpeech: SpeechSynthesisUtterance | null = null;
 let activeAudio: HTMLAudioElement | null = null;
@@ -29,12 +47,13 @@ let activeAudioContext: AudioContext | null = null;
 
 export function getDefaultTtsSettings(): TtsSettings {
   return {
-    provider: 'browser',
+    provider: 'qwen',
     browserVoice: '',
-    apiUrl: '',
+    apiUrl: defaultQwenTtsApiUrl,
     apiKey: '',
-    apiModel: 'tts-1',
-    apiVoice: 'alloy',
+    apiModel: defaultQwenTtsModel,
+    apiVoice: defaultQwenTtsVoice,
+    apiInstructions: defaultQwenTtsInstructions,
   };
 }
 
@@ -52,8 +71,22 @@ export function loadStoredTtsSettings(): TtsSettings {
     }
 
     const parsed = JSON.parse(raw) as Partial<TtsSettings>;
+    const isLegacyBrowserDefault = parsed.provider === 'browser'
+      && !parsed.browserVoice
+      && !parsed.apiUrl
+      && !parsed.apiKey
+      && (!parsed.apiModel || parsed.apiModel === 'tts-1')
+      && (!parsed.apiVoice || parsed.apiVoice === 'alloy');
+
+    if (isLegacyBrowserDefault) {
+      return fallback;
+    }
+
     return {
-      provider: parsed.provider === 'off' || parsed.provider === 'browser' || parsed.provider === 'api'
+      provider: parsed.provider === 'off'
+        || parsed.provider === 'browser'
+        || parsed.provider === 'qwen'
+        || parsed.provider === 'api'
         ? parsed.provider
         : fallback.provider,
       browserVoice: parsed.browserVoice ?? fallback.browserVoice,
@@ -61,6 +94,7 @@ export function loadStoredTtsSettings(): TtsSettings {
       apiKey: parsed.apiKey?.trim() ?? fallback.apiKey,
       apiModel: parsed.apiModel?.trim() ?? fallback.apiModel,
       apiVoice: parsed.apiVoice?.trim() ?? fallback.apiVoice,
+      apiInstructions: parsed.apiInstructions?.trim() ?? fallback.apiInstructions,
     };
   } catch {
     return fallback;
@@ -127,6 +161,74 @@ function stopMouthLoop(onMouthChange: (value: number) => void) {
   onMouthChange(0);
 }
 
+async function playAudioBlob(audioBlob: Blob, onMouthChange: (value: number) => void) {
+  activeObjectUrl = URL.createObjectURL(audioBlob);
+  activeAudio = new Audio(activeObjectUrl);
+  activeAudioContext = new AudioContext();
+
+  const analyser = activeAudioContext.createAnalyser();
+  analyser.fftSize = 512;
+  const source = activeAudioContext.createMediaElementSource(activeAudio);
+  source.connect(analyser);
+  analyser.connect(activeAudioContext.destination);
+
+  const samples = new Uint8Array(analyser.frequencyBinCount);
+  function tick() {
+    analyser.getByteFrequencyData(samples);
+    const voiceBand = samples.slice(2, 34);
+    const average = voiceBand.reduce((sum, value) => sum + value, 0) / Math.max(voiceBand.length, 1);
+    onMouthChange(Math.min(0.95, Math.max(0, average / 120)));
+    activeAnimationFrame = requestAnimationFrame(tick);
+  }
+
+  activeAudio.onplay = () => {
+    activeAnimationFrame = requestAnimationFrame(tick);
+  };
+  activeAudio.onended = () => stopMouthLoop(onMouthChange);
+  activeAudio.onerror = () => stopMouthLoop(onMouthChange);
+
+  await activeAudioContext.resume();
+  await activeAudio.play();
+}
+
+async function playAudioUrl(audioUrl: string, onMouthChange: (value: number) => void) {
+  try {
+    const response = await fetch(audioUrl);
+    if (!response.ok) {
+      throw new Error(`Audio fetch failed with ${response.status}`);
+    }
+
+    await playAudioBlob(await response.blob(), onMouthChange);
+  } catch {
+    activeAudio = new Audio(audioUrl);
+    activeAudio.onplay = () => startSyntheticMouthLoop(onMouthChange);
+    activeAudio.onended = () => stopMouthLoop(onMouthChange);
+    activeAudio.onerror = () => stopMouthLoop(onMouthChange);
+    await activeAudio.play();
+  }
+}
+
+function isLocalDevHost() {
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
+function resolveQwenApiUrl(apiUrl: string) {
+  if (!isLocalDevHost()) {
+    return apiUrl;
+  }
+
+  try {
+    const parsedUrl = new URL(apiUrl);
+    if (parsedUrl.origin === new URL(directQwenTtsApiUrl).origin) {
+      return `/dashscope${parsedUrl.pathname}${parsedUrl.search}`;
+    }
+  } catch {
+    return apiUrl;
+  }
+
+  return apiUrl;
+}
+
 function speakWithBrowser({ text, settings, onMouthChange }: SpeakArgs) {
   if (!('speechSynthesis' in window)) {
     throw new Error('Browser speech synthesis is not supported in this environment.');
@@ -182,38 +284,67 @@ async function speakWithApi({ text, settings, onMouthChange }: SpeakArgs) {
   }
 
   const audioBlob = await response.blob();
-  activeObjectUrl = URL.createObjectURL(audioBlob);
-  activeAudio = new Audio(activeObjectUrl);
-  activeAudioContext = new AudioContext();
+  await playAudioBlob(audioBlob, onMouthChange);
+}
 
-  const analyser = activeAudioContext.createAnalyser();
-  analyser.fftSize = 512;
-  const source = activeAudioContext.createMediaElementSource(activeAudio);
-  source.connect(analyser);
-  analyser.connect(activeAudioContext.destination);
+async function speakWithQwen({ text, settings, fallbackApiKey, onMouthChange }: SpeakArgs) {
+  const apiKey = settings.apiKey.trim() || fallbackApiKey?.trim();
 
-  const samples = new Uint8Array(analyser.frequencyBinCount);
-  function tick() {
-    analyser.getByteFrequencyData(samples);
-    const voiceBand = samples.slice(2, 34);
-    const average = voiceBand.reduce((sum, value) => sum + value, 0) / Math.max(voiceBand.length, 1);
-    onMouthChange(Math.min(0.95, Math.max(0, average / 120)));
-    activeAnimationFrame = requestAnimationFrame(tick);
+  if (!settings.apiUrl || !settings.apiModel || !settings.apiVoice || !apiKey) {
+    throw new Error('Qwen TTS settings are incomplete.');
   }
 
-  activeAudio.onplay = () => {
-    activeAnimationFrame = requestAnimationFrame(tick);
-  };
-  activeAudio.onended = () => stopMouthLoop(onMouthChange);
-  activeAudio.onerror = () => stopMouthLoop(onMouthChange);
+  stopSpeaking();
 
-  await activeAudioContext.resume();
-  await activeAudio.play();
+  const response = await fetch(resolveQwenApiUrl(settings.apiUrl), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: settings.apiModel,
+      input: {
+        text,
+        voice: settings.apiVoice,
+        language_type: 'Chinese',
+        ...(settings.apiInstructions
+          ? {
+              instructions: settings.apiInstructions,
+              optimize_instructions: true,
+            }
+          : {}),
+      },
+    }),
+  });
+
+  let payload: QwenTtsResponse | null = null;
+  try {
+    payload = await response.json() as QwenTtsResponse;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.message || `Qwen TTS failed with ${response.status}`);
+  }
+
+  const audioUrl = payload?.output?.audio?.url;
+  if (!audioUrl) {
+    throw new Error(payload?.message || 'Qwen TTS returned no audio URL.');
+  }
+
+  await playAudioUrl(audioUrl, onMouthChange);
 }
 
 export async function speakText(args: SpeakArgs) {
   if (!args.text.trim() || args.settings.provider === 'off') {
     args.onMouthChange(0);
+    return;
+  }
+
+  if (args.settings.provider === 'qwen') {
+    await speakWithQwen(args);
     return;
   }
 

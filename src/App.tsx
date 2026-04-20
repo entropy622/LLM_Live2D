@@ -22,6 +22,10 @@ import {
   type ChatMessage,
 } from './lib/llm.ts';
 import {
+  defaultQwenTtsApiUrl,
+  defaultQwenTtsInstructions,
+  defaultQwenTtsModel,
+  defaultQwenTtsVoice,
   getDefaultTtsSettings,
   loadStoredTtsSettings,
   saveStoredTtsSettings,
@@ -196,6 +200,7 @@ export default function App() {
       void speakText({
         text: response.reply,
         settings: ttsSettings,
+        fallbackApiKey: llmSettings.apiKey,
         onMouthChange: setMouthOpen,
       }).catch((error) => {
         console.error(error);
@@ -269,6 +274,14 @@ export default function App() {
   function updateTtsSettings(patch: Partial<TtsSettings>) {
     setTtsSettings((current) => ({
       ...current,
+      ...(patch.provider === 'qwen'
+        ? {
+            apiUrl: current.apiUrl || defaultQwenTtsApiUrl,
+            apiModel: current.apiModel === 'tts-1' ? defaultQwenTtsModel : current.apiModel || defaultQwenTtsModel,
+            apiVoice: current.apiVoice === 'alloy' ? defaultQwenTtsVoice : current.apiVoice || defaultQwenTtsVoice,
+            apiInstructions: current.apiInstructions || defaultQwenTtsInstructions,
+          }
+        : {}),
       ...patch,
     }));
   }
@@ -568,6 +581,7 @@ export default function App() {
                     value={ttsSettings.provider}
                     onChange={(event) => updateTtsSettings({ provider: event.target.value as TtsSettings['provider'] })}
                   >
+                    <option value="qwen">Qwen / DashScope</option>
                     <option value="browser">Browser / System Voice</option>
                     <option value="api">TTS API</option>
                     <option value="off">Off</option>
@@ -594,8 +608,8 @@ export default function App() {
                     type="text"
                     value={ttsSettings.apiUrl}
                     onChange={(event) => updateTtsSettings({ apiUrl: event.target.value })}
-                    placeholder="https://.../audio/speech"
-                    disabled={ttsSettings.provider !== 'api'}
+                    placeholder={defaultQwenTtsApiUrl}
+                    disabled={ttsSettings.provider !== 'api' && ttsSettings.provider !== 'qwen'}
                   />
                 </label>
                 <label className="field">
@@ -604,8 +618,8 @@ export default function App() {
                     type="text"
                     value={ttsSettings.apiModel}
                     onChange={(event) => updateTtsSettings({ apiModel: event.target.value })}
-                    placeholder="tts-1"
-                    disabled={ttsSettings.provider !== 'api'}
+                    placeholder="qwen3-tts-instruct-flash"
+                    disabled={ttsSettings.provider !== 'api' && ttsSettings.provider !== 'qwen'}
                   />
                 </label>
                 <label className="field">
@@ -614,8 +628,8 @@ export default function App() {
                     type="text"
                     value={ttsSettings.apiVoice}
                     onChange={(event) => updateTtsSettings({ apiVoice: event.target.value })}
-                    placeholder="alloy"
-                    disabled={ttsSettings.provider !== 'api'}
+                    placeholder="Bunny"
+                    disabled={ttsSettings.provider !== 'api' && ttsSettings.provider !== 'qwen'}
                   />
                 </label>
                 <label className="field">
@@ -624,8 +638,18 @@ export default function App() {
                     type="password"
                     value={ttsSettings.apiKey}
                     onChange={(event) => updateTtsSettings({ apiKey: event.target.value })}
-                    placeholder="sk-..."
-                    disabled={ttsSettings.provider !== 'api'}
+                    placeholder="Empty = reuse LLM API Key"
+                    disabled={ttsSettings.provider !== 'api' && ttsSettings.provider !== 'qwen'}
+                  />
+                </label>
+                <label className="field settings-wide-field">
+                  <span>TTS Instructions</span>
+                  <input
+                    type="text"
+                    value={ttsSettings.apiInstructions}
+                    onChange={(event) => updateTtsSettings({ apiInstructions: event.target.value })}
+                    placeholder={defaultQwenTtsInstructions}
+                    disabled={ttsSettings.provider !== 'qwen'}
                   />
                 </label>
               </div>
