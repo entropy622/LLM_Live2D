@@ -9,6 +9,12 @@
 
 <img width="2559" height="1353" alt="image" src="https://github.com/user-attachments/assets/7e294840-e27d-4886-92ec-4663e7564ce7" />
 
+
+https://github.com/user-attachments/assets/98a008c2-c767-4894-9c0d-8426b2cf065f
+
+这里用的是Qwen-tts
+
+
 ## 背景
 
 这个项目受 `Neuro Sama` 启发。
