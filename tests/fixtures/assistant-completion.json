@@ -1,0 +1,8 @@
+{
+  "reply": "Hello!",
+  "expression": "neutral",
+  "expressionMix": [{ "expression": "neutral", "weight": 1 }],
+  "parameterOverrides": [],
+  "intensity": 0.65,
+  "durationMs": 2800
+}
