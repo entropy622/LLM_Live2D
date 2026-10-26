@@ -317,7 +317,12 @@ async function fetchRemoteCompletion(
   const shouldDisableThinking = normalizedModel.startsWith('qwen')
     && !normalizedModel.includes('thinking');
 
-  const response = await fetch(apiUrl, {
+  let endpoint = apiUrl.trim().replace(/\/+$/, '');
+  if (!endpoint.endsWith('/chat/completions')) {
+    endpoint += '/chat/completions';
+  }
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

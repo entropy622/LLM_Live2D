@@ -82,6 +82,8 @@ VITE_LLM_API_KEY=your_api_key_here
 VITE_LLM_MODEL=deepseek-chat
 ```
 
+API URL 可以填写基础地址（如 `https://api.deepseek.com`、`https://api.deepseek.com/v1`），也可以填写完整的 `/chat/completions` 端点。发送请求时会清理首尾空白和尾部斜杠，并在缺少时自动补齐 `/chat/completions`，保留已有的版本或服务路径。
+
 可以参考 [.env.example](./.env.example)。
 
 ## 目录说明
@@ -148,6 +150,12 @@ expressions 和 params 都改成运行时自动发现。
 即使 LLM 返回了参数，也会经过本地白名单和范围裁剪，再进入渲染层。
 
 ## 构建与检查
+
+LLM 请求回归测试（使用本地 HTTP 服务，无需 API Key）：
+
+```bash
+pnpm test
+```
 
 构建：
 
